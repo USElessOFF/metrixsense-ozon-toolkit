@@ -129,6 +129,33 @@ class SellerRatingSectionResponse(SectionMeta):
     data: list[SellerRatingRow] = Field(default_factory=list)
 
 
+
+class StockPlanningRow(BaseModel):
+    """Строка секции планирования поставок (/v1/analytics/turnover/stocks)"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    sku: int | None = Field(default=None, description="SKU товара.")
+    name: str | None = Field(default=None, description="Название товара.")
+    offer_id: str | None = Field(default=None, description="Артикул продавца.")
+    current_stock: int | None = Field(default=None, description="Текущий остаток, шт.")
+    ads: float | None = Field(default=None, description="Среднесуточные продажи за 60 дней, шт/день.")
+    days_of_stock: float | None = Field(default=None, description="Дней запаса (текущий остаток / ADS).")
+    idc: float | None = Field(default=None, description="Индекс достаточности Ozon, дней.")
+    idc_grade: str | None = Field(default=None, description="Оценка достаточности Ozon.")
+    turnover: float | None = Field(default=None, description="Оборачиваемость Ozon, дней.")
+    recommended_stock: float | None = Field(default=None, description="Рекомендуемая поставка, шт.")
+    needs_reorder: bool = Field(default=False, description="Нужна поставка: остатка < заданного порога дней.")
+
+
+class StockPlanningSectionResponse(SectionMeta):
+    """Ответ секции «Планирование поставок»"""
+
+    target_days: int = Field(default=30, description="Целевой запас, дней (настройка).")
+    critical_days: int = Field(default=14, description="Порог критического запаса, дней.")
+    data: list[StockPlanningRow] = Field(default_factory=list)
+
+
 class OnboardingStatusResponse(BaseModel):
     """Статус онбординга: только факты из БД, без внешних вызовов"""
 

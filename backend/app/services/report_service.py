@@ -46,6 +46,8 @@ from backend.app.pydantic_models.ozon.seller.request import (
     TurnoverStocksRequest,
     ProductQueriesRequest,
     AnalyticsStocksRequest,
+    FinanceTransactionDateFilter,
+    FinanceTransactionListFilter,
     FinanceTransactionListRequest,
     FinanceTransactionTotalsRequest,
     ProductInfoListRequest,
@@ -65,6 +67,8 @@ from backend.app.pydantic_models.report_sections import (
     ProductCardsSectionResponse,
     SellerRatingRow,
     SellerRatingSectionResponse,
+    CashFlowRow,
+    CashFlowSectionResponse,
     SearchQueryRow,
     SearchQueriesSectionResponse,
     StockPlanningRow,
@@ -519,6 +523,100 @@ class ReportService:
             data=rows,
         )
         await self._cache_section_payload("search_queries", payload.model_dump(mode="json"), cache_key=cache_key)
+        return payload
+
+    async def get_cashflow_section(
+        self, seller: OzonSellerClient, date_from: str, date_to: str
+    ) -> CashFlowSectionResponse:
+        """Секция «ДДС-журнал»: все операции периода с бегущим балансом"""
+        generated_at = datetime.now(tz=timezone.utc)
+        cache_key = self._section_cache_key("cashflow", f"{date_from}_{date_to}")
+
+        cached = await self._get_cached_section(cache_key, CashFlowSectionResponse)
+        if cached is not None:
+            return cached
+
+        operations = []
+        page = 1
+        while True:
+            resp = await seller.get_finance_transaction_list(
+                FinanceTransactionListRequest(
+                    filter_=FinanceTransactionListFilter(
+                        date=FinanceTransactionDateFilter(
+                            from_=datetime.strptime(date_from, DATE_FORMAT).replace(tzinfo=timezone.utc),
+                            to=datetime.strptime(date_to, DATE_FORMAT).replace(tzinfo=timezone.utc),
+                        ),
+                        transaction_type=TransactionType.ALL,
+                    ),
+                    page=page,
+                    page_size=1000,
+                )
+            )
+            operations.extend(resp.operations)
+            logger.info(
+                "::cashflow fetch page",
+                page=page,
+                got=len(resp.operations),
+                total_collected=len(operations),
+            )
+            if resp.page_count is None or page >= resp.page_count:
+                break
+            page += 1
+
+        type_names = sorted({o.operation_type_name or o.operation_type or "unknown" for o in operations})
+        logger.info(
+            "::cashflow collected",
+            operations=len(operations),
+            types=type_names,
+        )
+
+        def _op_date(op: Any) -> datetime:
+            if not op.operation_date:
+                return datetime.min.replace(tzinfo=timezone.utc)
+            try:
+                return datetime.fromisoformat(op.operation_date.replace("Z", "+00:00"))
+            except ValueError:
+                return datetime.min.replace(tzinfo=timezone.utc)
+
+        operations.sort(key=_op_date)
+
+        rows: list[CashFlowRow] = []
+        balance = 0.0
+        total_income = 0.0
+        total_expense = 0.0
+        type_summary: dict[str, float] = {}
+        for op in operations:
+            amount = op.amount or 0.0
+            balance += amount
+            if amount >= 0:
+                total_income += amount
+            else:
+                total_expense += abs(amount)
+            type_name = op.operation_type_name or op.operation_type or "Прочее"
+            type_summary[type_name] = type_summary.get(type_name, 0.0) + amount
+            rows.append(
+                CashFlowRow(
+                    date=op.operation_date,
+                    operation_type=op.operation_type,
+                    operation_type_name=op.operation_type_name,
+                    amount=amount,
+                    balance_after=round(balance, 2),
+                )
+            )
+
+        payload = CashFlowSectionResponse(
+            section="cashflow",
+            generated_at=generated_at,
+            row_count=len(rows),
+            date_from=date_from,
+            date_to=date_to,
+            total_income=round(total_income, 2),
+            total_expense=round(total_expense, 2),
+            net_flow=round(total_income - total_expense, 2),
+            type_summary={k: round(v, 2) for k, v in type_summary.items()},
+            data=rows,
+        )
+        await self._cache_section_payload("cashflow", payload.model_dump(mode="json"), cache_key=cache_key)
         return payload
 
     @staticmethod

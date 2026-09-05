@@ -15,6 +15,7 @@ from backend.app.pydantic_models.report_sections import (
     PricesCommissionsSectionResponse,
     ProductCardsSectionResponse,
     SellerRatingSectionResponse,
+    CashFlowSectionResponse,
     SearchQueriesSectionResponse,
     StockPlanningSectionResponse,
 )
@@ -164,6 +165,25 @@ def get_reports_router() -> APIRouter:
             )
         except Exception as e:
             logger.error("Search queries section failed", error=str(e))
+            raise HTTPException(status_code=_http_status(e), detail=str(e))
+
+    @router.post(
+        "/sections/cashflow",
+        response_model=CashFlowSectionResponse,
+    )
+    async def get_cashflow(
+        data: ReportRequest,
+        seller: OzonSellerClient = Depends(get_ozon_seller_client),  # noqa: B008
+        db: MetrixAdapter = Depends(get_metrix_adapter_for_user),  # noqa: B008
+    ) -> CashFlowSectionResponse:
+        """ДДС-журнал: все операции периода, приход/расход, бегущий баланс"""
+        service = ReportService(db)
+        try:
+            return await service.get_cashflow_section(
+                seller, data.date_from, data.date_to
+            )
+        except Exception as e:
+            logger.error("Cashflow section failed", error=str(e))
             raise HTTPException(status_code=_http_status(e), detail=str(e))
 
     # /requests/ — от коллизий с /sections/*

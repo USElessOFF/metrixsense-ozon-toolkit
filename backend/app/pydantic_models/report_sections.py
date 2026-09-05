@@ -181,6 +181,33 @@ class SearchQueriesSectionResponse(SectionMeta):
     data: list[SearchQueryRow] = Field(default_factory=list)
 
 
+
+class CashFlowRow(BaseModel):
+    """Строка ДДС-журнала (операция с бегущим балансом)"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    date: str | None = Field(default=None, description="Дата операции.")
+    operation_type: str | None = Field(default=None, description="Тип операции (API).")
+    operation_type_name: str | None = Field(default=None, description="Название типа операции.")
+    amount: float | None = Field(default=None, description="Сумма: + приход, - расход, ₽.")
+    balance_after: float | None = Field(default=None, description="Накопленный баланс после операции, ₽.")
+
+
+class CashFlowSectionResponse(SectionMeta):
+    """Ответ секции «ДДС-журнал»"""
+
+    date_from: str = Field(..., description="Начало периода (YYYY-MM-DD).")
+    date_to: str = Field(..., description="Конец периода (YYYY-MM-DD).")
+    total_income: float = Field(default=0.0, description="Сумма приходов, ₽.")
+    total_expense: float = Field(default=0.0, description="Сумма расходов, ₽.")
+    net_flow: float = Field(default=0.0, description="Чистый денежный поток, ₽.")
+    type_summary: dict[str, float] = Field(
+        default_factory=dict, description="Итог по каждому типу операции, ₽."
+    )
+    data: list[CashFlowRow] = Field(default_factory=list)
+
+
 class OnboardingStatusResponse(BaseModel):
     """Статус онбординга: только факты из БД, без внешних вызовов"""
 

@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.exceptions import SettingsError
 from backend.app.models.analytics_cache import AnalyticsCache
 from backend.app.models.ozon_secrets import OzonSecrets
+from backend.app.security import DecryptedSecrets, decrypt, encrypt
 from backend.app.models.product_dimensions import ProductDimensions
 from backend.app.models.report_request import ReportRequestOzon, ReportType
 from backend.app.models.user_settings import UserSettings
@@ -56,25 +57,36 @@ class MetrixAdapter(BaseAdapter):
             )
         return await self.update_object(current, update_data)
 
-    async def get_secrets(self) -> OzonSecrets | None:
+    async def _get_secrets_orm(self) -> OzonSecrets | None:
         result = await self.session.execute(
             select(OzonSecrets).where(OzonSecrets.user_id == self.user_id)
         )
         return result.scalar_one_or_none()
 
+    async def get_secrets(self) -> DecryptedSecrets | None:
+        orm = await self._get_secrets_orm()
+        if orm is None:
+            return None
+        return DecryptedSecrets(
+            seller_client_id=decrypt(orm.seller_client_id),
+            seller_api_key=decrypt(orm.seller_api_key),
+            performance_client_id=decrypt(orm.performance_client_id),
+            performance_secret=decrypt(orm.performance_secret),
+        )
+
     async def update_secrets(self, data: dict[str, Any]) -> OzonSecrets:
-        current = await self.get_secrets()
+        current = await self._get_secrets_orm()
         allowed_fields = {"seller_client_id", "seller_api_key", "performance_client_id", "performance_secret"}
-        update_data = {k: v for k, v in data.items() if k in allowed_fields}
+        encrypted_data = {k: encrypt(v) for k, v in data.items() if k in allowed_fields}
 
         if current is None:
-            new_secrets = OzonSecrets(user_id=self.user_id, **update_data)
+            new_secrets = OzonSecrets(user_id=self.user_id, **encrypted_data)
             return await self.create_object(new_secrets)
 
-        return await self.update_object(current, update_data)
+        return await self.update_object(current, encrypted_data)
 
     async def clear_secrets(self) -> None:
-        current = await self.get_secrets()
+        current = await self._get_secrets_orm()
         if current:
             await self.delete_object(current)
 

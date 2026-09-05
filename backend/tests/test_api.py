@@ -215,12 +215,12 @@ class TestSecrets:
         )
         assert resp.status_code == 200
 
-        # Verify stored secrets
+        # Verify stored secrets are returned masked (full keys never leave the server)
         resp = await client.get(self.SECRETS_URL, headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()
-        assert data.get("seller_client_id") == "test_seller_id"
-        assert data.get("seller_api_key") == "test_seller_key"
+        assert data.get("seller_client_id") == "te********r_id"
+        assert data.get("seller_api_key") == "te********_key"
 
     @pytest.mark.asyncio
     async def test_secrets_user_isolation(self, client: AsyncClient, auth_headers: dict[str, Any]):

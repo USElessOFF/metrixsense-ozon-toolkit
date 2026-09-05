@@ -6,6 +6,7 @@ from backend.app.depends.db import get_metrix_adapter_for_user
 from backend.app.ozon_performance import OzonPerformanceClient
 from backend.app.ozon_seller import OzonSellerClient
 from backend.app.pydantic_models.secrets import SecretsResponse, SecretsUpdate
+from backend.app.security import decrypt, mask
 
 
 def get_secrets_router() -> APIRouter:
@@ -13,29 +14,47 @@ def get_secrets_router() -> APIRouter:
 
     @router.get("/secrets", response_model=SecretsResponse)
     async def get_secrets(db: MetrixAdapter = Depends(get_metrix_adapter_for_user)):  # noqa: B008
-        """Сохранённые секреты Ozon API для текущего пользователя"""
+        """Сохранённые секреты Ozon API для текущего пользователя (маскированные)"""
         secrets = await db.get_secrets()
         if not secrets:
             return SecretsResponse()
+
+        seller_valid = False
+        performance_valid = False
+        try:
+            if secrets.seller_client_id and secrets.seller_api_key:
+                c = OzonSellerClient(secrets.seller_client_id, secrets.seller_api_key)
+                seller_valid = await c.check_connection()
+                await c.close()
+        except Exception:
+            seller_valid = False
+        try:
+            if secrets.performance_client_id and secrets.performance_secret:
+                c = OzonPerformanceClient(secrets.performance_client_id, secrets.performance_secret)
+                performance_valid = await c.check_connection()
+                await c.close()
+        except Exception:
+            performance_valid = False
+
         return SecretsResponse(
-            seller_client_id=secrets.seller_client_id,
-            seller_api_key=secrets.seller_api_key,
-            performance_client_id=secrets.performance_client_id,
-            performance_secret=secrets.performance_secret,
-            seller_valid=False,
-            performance_valid=False,
+            seller_client_id=mask(secrets.seller_client_id),
+            seller_api_key=mask(secrets.seller_api_key),
+            performance_client_id=mask(secrets.performance_client_id),
+            performance_secret=mask(secrets.performance_secret),
+            seller_valid=seller_valid,
+            performance_valid=performance_valid,
         )
 
     @router.post("/secrets", response_model=SecretsResponse)
     async def create_secrets(data: SecretsUpdate, db: MetrixAdapter = Depends(get_metrix_adapter_for_user)):  # noqa: B008
         """Создать или обновить секреты Ozon API для текущего пользователя"""
         update_data = data.model_dump(exclude_none=True)
-        secrets = await db.update_secrets(update_data)
+        orm = await db.update_secrets(update_data)
         return SecretsResponse(
-            seller_client_id=secrets.seller_client_id,
-            seller_api_key=secrets.seller_api_key,
-            performance_client_id=secrets.performance_client_id,
-            performance_secret=secrets.performance_secret,
+            seller_client_id=mask(decrypt(orm.seller_client_id)),
+            seller_api_key=mask(decrypt(orm.seller_api_key)),
+            performance_client_id=mask(decrypt(orm.performance_client_id)),
+            performance_secret=mask(decrypt(orm.performance_secret)),
             seller_valid=False,
             performance_valid=False,
         )

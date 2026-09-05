@@ -7,6 +7,7 @@ from backend.app.adapters.user_adapter import UserAdapter
 from backend.app.config import settings
 from backend.app.database import async_session, close_db, init_db
 from backend.app.get_bg_tasks import background_tasks
+from backend.app.services.sync_scheduler import shutdown_scheduler, start_scheduler
 
 logger = structlog.get_logger(__name__)
 
@@ -44,7 +45,9 @@ async def lifespan(fastapi_app: FastAPI):
             host=settings.HOST,
             hint="Set DEFAULT_PASSWORD in backend/.env to secure the app",
         )
+    start_scheduler()
     yield
+    await shutdown_scheduler()
     logger.info("Shutting down MetrixSense server")
     if not background_tasks.is_empty():
         logger.info(

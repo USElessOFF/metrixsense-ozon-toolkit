@@ -82,6 +82,17 @@ class Settings(BaseSettings):
     DEFAULT_USERNAME: str = "metrixsense"
     DEFAULT_PASSWORD: str = "metrixsense"
 
+    # Auto-sync scheduler
+    SYNC_ENABLED: bool = True
+    SYNC_CRON_HOUR: int = 3
+    SYNC_CRON_MINUTE: int = 0
+    SYNC_INITIAL_DAYS: int = 7
+    SYNC_MAX_DAYS_PER_RUN: int = 3
+    SYNC_OZON_DELAY_DAYS: int = 1
+    SYNC_MAX_RETRIES: int = 3
+    SYNC_RETRY_BACKOFF_SECONDS: int = 30
+    SYNC_MAX_INTERVAL_SECONDS: int = 10800  # 3h — если синк не было дольше, считаем протухшим
+
     model_config = SettingsConfigDict(
         env_file=ENV_PATH,
         env_file_encoding="utf-8",

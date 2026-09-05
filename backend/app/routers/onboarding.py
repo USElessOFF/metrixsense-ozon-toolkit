@@ -9,6 +9,7 @@ from backend.app.adapters.metrix_adapter import MetrixAdapter
 from backend.app.depends.db import get_metrix_adapter_for_user
 from backend.app.ozon_performance import OzonPerformanceClient
 from backend.app.ozon_seller import OzonSellerClient
+from backend.app.services.sync_scheduler import trigger_initial_sync
 from backend.app.pydantic_models.report_sections import (
     CheckConnectionRequest,
     CheckConnectionResponse,
@@ -123,6 +124,9 @@ def get_onboarding_router() -> APIRouter:
                 await seller.close()
             if performance is not None:
                 await performance.close()
+
+        if seller_connected or performance_connected:
+            await trigger_initial_sync()
 
         return CheckConnectionResponse(
             seller_connected=seller_connected,

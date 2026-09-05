@@ -1,4 +1,5 @@
 
+from .analog import get_analog_router
 from .auth import get_auth_router
 from .calculator import get_calculator_router
 from .health import get_health_router
@@ -8,6 +9,7 @@ from .secrets import get_secrets_router
 from .settings import get_settings_router
 
 __all__ = [
+    "get_analog_router",
     "get_auth_router",
     "get_calculator_router",
     "get_health_router",

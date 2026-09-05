@@ -11,6 +11,7 @@ from backend.app.config import PROJECT_ROOT, settings
 from backend.app.lifespan import lifespan
 from backend.app.logger import setup_logging
 from backend.app.routers import (
+    get_calculator_router,
     get_auth_router,
     get_health_router,
     get_onboarding_router,
@@ -43,6 +44,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    app.include_router(get_calculator_router())
     app.include_router(get_auth_router())
     app.include_router(get_health_router())
     app.include_router(get_onboarding_router())

@@ -15,6 +15,7 @@ from backend.app.pydantic_models.report_sections import (
     PricesCommissionsSectionResponse,
     ProductCardsSectionResponse,
     SellerRatingSectionResponse,
+    SearchQueriesSectionResponse,
     StockPlanningSectionResponse,
 )
 from backend.app.pydantic_models.reports import (
@@ -144,6 +145,25 @@ def get_reports_router() -> APIRouter:
             return await service.get_stock_planning_section(seller)
         except Exception as e:
             logger.error("Stock planning section failed", error=str(e))
+            raise HTTPException(status_code=_http_status(e), detail=str(e))
+
+    @router.post(
+        "/sections/search-queries",
+        response_model=SearchQueriesSectionResponse,
+    )
+    async def get_search_queries(
+        data: ReportRequest,
+        seller: OzonSellerClient = Depends(get_ozon_seller_client),  # noqa: B008
+        db: MetrixAdapter = Depends(get_metrix_adapter_for_user),  # noqa: B008
+    ) -> SearchQueriesSectionResponse:
+        """Поисковые фразы: показы, позиции, конверсии (/v1/analytics/product-queries)"""
+        service = ReportService(db)
+        try:
+            return await service.get_search_queries_section(
+                seller, data.date_from, data.date_to
+            )
+        except Exception as e:
+            logger.error("Search queries section failed", error=str(e))
             raise HTTPException(status_code=_http_status(e), detail=str(e))
 
     # /requests/ — от коллизий с /sections/*

@@ -594,6 +594,7 @@ class ProductInfoStocksStock(OzonBaseModel):
     shipment_type: str | None = Field(default=None, description="Тип отгрузки.")
     sku: int | None = Field(default=None, description="SKU.")
     type: str | None = Field(default=None, description="Тип склада.")
+    warehouse_name: str | None = Field(default=None, description="Название склада.")
 
 
 class ProductInfoStocksItem(OzonBaseModel):

@@ -130,6 +130,25 @@ class SellerRatingSectionResponse(SectionMeta):
 
 
 
+class StockWarehouseRow(BaseModel):
+    """Остаток SKU на конкретном складе"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    name: str | None = Field(default=None, description="Название склада.")
+    present: int | None = Field(default=None, description="Доступно, шт.")
+    reserved: int | None = Field(default=None, description="Зарезервировано, шт.")
+
+
+class PlanSummary(BaseModel):
+    """Сводка плана поставки"""
+
+    skus_total: int = Field(default=0, description="Всего SKU в плане.")
+    skus_needs_reorder: int = Field(default=0, description="SKU, требующих поставки.")
+    skus_critical: int = Field(default=0, description="SKU с критическим запасом.")
+    total_units_to_ship: int = Field(default=0, description="Суммарная рекомендуемая поставка, шт.")
+
+
 class StockPlanningRow(BaseModel):
     """Строка секции планирования поставок (/v1/analytics/turnover/stocks)"""
 
@@ -145,7 +164,13 @@ class StockPlanningRow(BaseModel):
     idc_grade: str | None = Field(default=None, description="Оценка достаточности Ozon.")
     turnover: float | None = Field(default=None, description="Оборачиваемость Ozon, дней.")
     recommended_stock: float | None = Field(default=None, description="Рекомендуемая поставка, шт.")
+    recommended_units: int | None = Field(default=None, description="Рекомендуемая поставка, целых шт.")
     needs_reorder: bool = Field(default=False, description="Нужна поставка: остатка < заданного порога дней.")
+    priority: str = Field(default="normal", description="critical / low / normal / no-velocity.")
+    due_by: str | None = Field(default=None, description="Дата ухода остатка в ноль (YYYY-MM-DD).")
+    warehouses: list[StockWarehouseRow] = Field(
+        default_factory=list, description="Разбивка остатка по складам (/v4/product/info/stocks)."
+    )
 
 
 class StockPlanningSectionResponse(SectionMeta):
@@ -153,6 +178,7 @@ class StockPlanningSectionResponse(SectionMeta):
 
     target_days: int = Field(default=30, description="Целевой запас, дней (настройка).")
     critical_days: int = Field(default=14, description="Порог критического запаса, дней.")
+    plan_summary: PlanSummary = Field(default_factory=PlanSummary, description="Сводка плана поставки.")
     data: list[StockPlanningRow] = Field(default_factory=list)
 
 

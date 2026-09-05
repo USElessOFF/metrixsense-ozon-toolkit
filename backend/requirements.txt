@@ -30,7 +30,7 @@ aiofiles>=23.2.0
 
 # Reports
 pandas>=2.0.0
-numpy>=1.24.0
+numpy>=2.5.2
 xlsxwriter>=3.2.9
 
 # Testing

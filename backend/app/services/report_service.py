@@ -17,6 +17,7 @@ from numpy import nan
 from pydantic import BaseModel, ValidationError
 
 from backend.app import config
+from backend.app.config import settings
 from backend.app.adapters.metrix_adapter import MetrixAdapter
 from backend.app.database import get_async_context_session
 from backend.app.exceptions import OzonAPIError, SettingsError
@@ -42,6 +43,7 @@ from backend.app.pydantic_models.ozon.performance.request import (
 from backend.app.pydantic_models.ozon.performance.response import Campaign
 from backend.app.pydantic_models.ozon.seller.enums import TransactionType
 from backend.app.pydantic_models.ozon.seller.request import (
+    TurnoverStocksRequest,
     AnalyticsStocksRequest,
     FinanceTransactionListRequest,
     FinanceTransactionTotalsRequest,
@@ -62,6 +64,8 @@ from backend.app.pydantic_models.report_sections import (
     ProductCardsSectionResponse,
     SellerRatingRow,
     SellerRatingSectionResponse,
+    StockPlanningRow,
+    StockPlanningSectionResponse,
 )
 from backend.app.tax import INCOME_MINUS_EXPENSE_SYSTEMS, get_tax_rate
 
@@ -398,6 +402,78 @@ class ReportService:
         )
         await self._cache_section_payload("seller_rating", payload.model_dump(mode="json"), cache_key=cache_key)
         return payload
+
+    async def get_stock_planning_section(
+        self, seller: OzonSellerClient
+    ) -> StockPlanningSectionResponse:
+        """Секция «Планирование поставок» (/v1/analytics/turnover/stocks)"""
+        generated_at = datetime.now(tz=timezone.utc)
+        cache_key = self._section_cache_key("stock_planning")
+
+        cached = await self._get_cached_section(cache_key, StockPlanningSectionResponse)
+        if cached is not None:
+            return cached
+
+        cards = await seller.get_product_info_list(ProductInfoListRequest(limit=1000))
+        skus = [str(item.sku) for item in cards.items if item.sku]
+        if not skus:
+            empty = StockPlanningSectionResponse(section="stock_planning", generated_at=generated_at, row_count=0, data=[])
+            await self._cache_section_payload("stock_planning", empty.model_dump(mode="json"), cache_key=cache_key)
+            return empty
+
+        rows: list[StockPlanningRow] = []
+        for sku in self.pd_util.split_list(skus, max_length=10):
+            resp = await seller.get_turnover_stocks(TurnoverStocksRequest(skus=sku))
+            for item in resp.items:
+                calc = self._calc_stock_recommendation(
+                    item, target_days=settings.STOCK_TARGET_DAYS, critical_days=settings.STOCK_CRITICAL_DAYS
+                )
+                rows.append(
+                    StockPlanningRow(
+                        sku=item.sku,
+                        name=item.name,
+                        offer_id=item.offer_id,
+                        current_stock=item.current_stock,
+                        ads=item.ads,
+                        days_of_stock=round(calc["days_of_stock"], 1) if calc["days_of_stock"] is not None else None,
+                        idc=item.idc,
+                        idc_grade=item.idc_grade,
+                        turnover=item.turnover,
+                        recommended_stock=round(calc["recommended_stock"], 1) if calc["recommended_stock"] is not None else None,
+                        needs_reorder=calc["needs_reorder"],
+                    )
+                )
+
+        payload = StockPlanningSectionResponse(
+            section="stock_planning",
+            generated_at=generated_at,
+            row_count=len(rows),
+            target_days=settings.STOCK_TARGET_DAYS,
+            critical_days=settings.STOCK_CRITICAL_DAYS,
+            data=rows,
+        )
+        await self._cache_section_payload("stock_planning", payload.model_dump(mode="json"), cache_key=cache_key)
+        return payload
+
+    @staticmethod
+    def _calc_stock_recommendation(
+        item: Any,
+        *,
+        target_days: int,
+        critical_days: int,
+    ) -> dict[str, Any]:
+        """Дней запаса и рекомендуемая поставка по SKU"""
+        ads = item.ads or 0
+        if ads <= 0:
+            return {"days_of_stock": None, "recommended_stock": None, "needs_reorder": False}
+        current = item.current_stock or 0
+        days_of_stock = current / ads
+        recommended = max(0.0, ads * target_days - current)
+        return {
+            "days_of_stock": days_of_stock,
+            "recommended_stock": recommended,
+            "needs_reorder": days_of_stock < critical_days,
+        }
 
     @staticmethod
     def _validate_dates(date_from: datetime, date_to: datetime) -> None:

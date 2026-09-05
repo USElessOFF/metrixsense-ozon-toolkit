@@ -82,6 +82,10 @@ class Settings(BaseSettings):
     DEFAULT_USERNAME: str = "metrixsense"
     DEFAULT_PASSWORD: str = "metrixsense"
 
+
+    # Stock planning
+    STOCK_TARGET_DAYS: int = 30
+    STOCK_CRITICAL_DAYS: int = 14
     # Auto-sync scheduler
     SYNC_ENABLED: bool = True
     SYNC_CRON_HOUR: int = 3

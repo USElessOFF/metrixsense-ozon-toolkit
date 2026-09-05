@@ -603,3 +603,37 @@ class TestNewSellerMethods:
         result = await seller.get_rating_summary()
         assert isinstance(result, RatingSummaryResponse)
         assert result.groups == []
+
+
+
+class TestStockPlanning:
+    """Расчёт дней запаса и рекомендуемой поставки"""
+
+    def _row(self, **kw):
+        from backend.app.pydantic_models.ozon.seller.response import TurnoverStocksResponseItem
+        defaults = dict(sku=1, name="Товар", ads=None, current_stock=0, idc=None, idc_grade=None, turnover=None)
+        defaults.update(kw)
+        return TurnoverStocksResponseItem(**defaults)
+
+    def test_recommended_stock_target(self):
+        from backend.app.services.report_service import ReportService
+        item = self._row(ads=10, current_stock=50)
+        target = ReportService._calc_stock_recommendation(item, target_days=30, critical_days=14)
+        assert target["days_of_stock"] == 5.0
+        assert target["recommended_stock"] == 250.0
+        assert target["needs_reorder"] is True
+
+    def test_recommended_stock_no_sales(self):
+        from backend.app.services.report_service import ReportService
+        item = self._row(ads=0, current_stock=0)
+        target = ReportService._calc_stock_recommendation(item, target_days=30, critical_days=14)
+        assert target["days_of_stock"] is None
+        assert target["recommended_stock"] is None
+        assert target["needs_reorder"] is False
+
+    def test_recommended_stock_enough(self):
+        from backend.app.services.report_service import ReportService
+        item = self._row(ads=2, current_stock=100)
+        target = ReportService._calc_stock_recommendation(item, target_days=30, critical_days=14)
+        assert target["recommended_stock"] == 0.0
+        assert target["needs_reorder"] is False

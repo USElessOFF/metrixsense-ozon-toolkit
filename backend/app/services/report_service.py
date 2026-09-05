@@ -44,6 +44,7 @@ from backend.app.pydantic_models.ozon.performance.response import Campaign
 from backend.app.pydantic_models.ozon.seller.enums import TransactionType
 from backend.app.pydantic_models.ozon.seller.request import (
     TurnoverStocksRequest,
+    ProductQueriesRequest,
     AnalyticsStocksRequest,
     FinanceTransactionListRequest,
     FinanceTransactionTotalsRequest,
@@ -64,6 +65,8 @@ from backend.app.pydantic_models.report_sections import (
     ProductCardsSectionResponse,
     SellerRatingRow,
     SellerRatingSectionResponse,
+    SearchQueryRow,
+    SearchQueriesSectionResponse,
     StockPlanningRow,
     StockPlanningSectionResponse,
 )
@@ -453,6 +456,69 @@ class ReportService:
             data=rows,
         )
         await self._cache_section_payload("stock_planning", payload.model_dump(mode="json"), cache_key=cache_key)
+        return payload
+
+    async def get_search_queries_section(
+        self, seller: OzonSellerClient, date_from: str, date_to: str
+    ) -> SearchQueriesSectionResponse:
+        """Секция «Поисковые фразы» (/v1/analytics/product-queries)"""
+        generated_at = datetime.now(tz=timezone.utc)
+        cache_key = self._section_cache_key("search_queries", f"{date_from}_{date_to}")
+
+        cached = await self._get_cached_section(cache_key, SearchQueriesSectionResponse)
+        if cached is not None:
+            return cached
+
+        cards = await seller.get_product_info_list(ProductInfoListRequest(limit=1000))
+        skus = [str(item.sku) for item in cards.items if item.sku]
+        if not skus:
+            empty = SearchQueriesSectionResponse(
+                section="search_queries", generated_at=generated_at, row_count=0,
+                date_from=date_from, date_to=date_to, data=[],
+            )
+            await self._cache_section_payload("search_queries", empty.model_dump(mode="json"), cache_key=cache_key)
+            return empty
+
+        rows: list[SearchQueryRow] = []
+        for sku_batch in self.pd_util.split_list(skus, max_length=1000):
+            page = 1
+            while True:
+                resp = await seller.get_product_queries(
+                    ProductQueriesRequest(
+                        date_from=date_from,
+                        date_to=date_to,
+                        skus=sku_batch,
+                        page=page,
+                        page_size=1000,
+                    )
+                )
+                for item in resp.items:
+                    rows.append(
+                        SearchQueryRow(
+                            phrase=item.name,
+                            sku=item.sku,
+                            offer_id=item.offer_id,
+                            category=item.category,
+                            gmv=item.gmv,
+                            position=item.position,
+                            unique_search_users=item.unique_search_users,
+                            unique_view_users=item.unique_view_users,
+                            view_conversion=item.view_conversion,
+                        )
+                    )
+                if resp.page_count is None or page >= resp.page_count:
+                    break
+                page += 1
+
+        payload = SearchQueriesSectionResponse(
+            section="search_queries",
+            generated_at=generated_at,
+            row_count=len(rows),
+            date_from=date_from,
+            date_to=date_to,
+            data=rows,
+        )
+        await self._cache_section_payload("search_queries", payload.model_dump(mode="json"), cache_key=cache_key)
         return payload
 
     @staticmethod

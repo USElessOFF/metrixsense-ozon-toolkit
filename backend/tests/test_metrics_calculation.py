@@ -637,3 +637,56 @@ class TestStockPlanning:
         target = ReportService._calc_stock_recommendation(item, target_days=30, critical_days=14)
         assert target["recommended_stock"] == 0.0
         assert target["needs_reorder"] is False
+
+
+
+class TestSearchQueriesSection:
+    """Маппинг ответа product-queries в строки секции"""
+
+    def _item(self, **kw):
+        from backend.app.pydantic_models.ozon.seller.response import ProductQueriesResponseItem
+        defaults = dict(
+            name="футболка оверсайз",
+            sku=111,
+            offer_id="ART-1",
+            category="Одежда",
+            gmv=12500.0,
+            position=3.5,
+            unique_search_users=800,
+            unique_view_users=120,
+            view_conversion=15.0,
+        )
+        defaults.update(kw)
+        return ProductQueriesResponseItem(**defaults)
+
+    def test_row_mapping_name_to_phrase(self):
+        """name из API попадает в phrase (имя поля отличается)"""
+        from backend.app.pydantic_models.report_sections import SearchQueryRow
+        item = self._item()
+        row = SearchQueryRow(
+            phrase=item.name, sku=item.sku, offer_id=item.offer_id,
+            category=item.category, gmv=item.gmv, position=item.position,
+            unique_search_users=item.unique_search_users,
+            unique_view_users=item.unique_view_users,
+            view_conversion=item.view_conversion,
+        )
+        assert row.phrase == "футболка оверсайз"
+        assert row.gmv == 12500.0
+
+    def test_row_all_none_is_valid(self):
+        """Пустой элемент API не ломает строку"""
+        from backend.app.pydantic_models.report_sections import SearchQueryRow
+        row = SearchQueryRow()
+        assert row.phrase is None
+        assert row.unique_search_users is None
+
+    def test_product_queries_request_uses_page_size(self):
+        from backend.app.pydantic_models.ozon.seller.request import ProductQueriesRequest
+        req = ProductQueriesRequest(
+            date_from="2026-08-01", date_to="2026-08-31",
+            skus=[1, 2], page=2, page_size=1000,
+        )
+        payload = req.model_dump(mode="json", exclude_none=True)
+        assert payload["page"] == 2
+        assert payload["page_size"] == 1000
+        assert payload["skus"] == ["1", "2"]

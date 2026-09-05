@@ -156,6 +156,31 @@ class StockPlanningSectionResponse(SectionMeta):
     data: list[StockPlanningRow] = Field(default_factory=list)
 
 
+
+class SearchQueryRow(BaseModel):
+    """Строка секции поисковых фраз (/v1/analytics/product-queries)"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    phrase: str | None = Field(default=None, description="Поисковая фраза.")
+    sku: int | None = Field(default=None, description="SKU товара.")
+    offer_id: str | None = Field(default=None, description="Артикул продавца.")
+    category: str | None = Field(default=None, description="Категория запроса.")
+    gmv: float | None = Field(default=None, description="Доход по запросу, ₽.")
+    position: float | None = Field(default=None, description="Средняя позиция товара в поиске.")
+    unique_search_users: int | None = Field(default=None, description="Уникальные пользователи поиска.")
+    unique_view_users: int | None = Field(default=None, description="Уникальные пользователи карточки.")
+    view_conversion: float | None = Field(default=None, description="Конверсия из поиска в карточку, %.")
+
+
+class SearchQueriesSectionResponse(SectionMeta):
+    """Ответ секции «Поисковые фразы»"""
+
+    date_from: str = Field(..., description="Начало периода (YYYY-MM-DD).")
+    date_to: str = Field(..., description="Конец периода (YYYY-MM-DD).")
+    data: list[SearchQueryRow] = Field(default_factory=list)
+
+
 class OnboardingStatusResponse(BaseModel):
     """Статус онбординга: только факты из БД, без внешних вызовов"""
 

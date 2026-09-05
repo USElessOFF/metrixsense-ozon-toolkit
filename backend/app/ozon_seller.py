@@ -118,7 +118,13 @@ class OzonSellerClient:
             request = ProductListRequest()
         payload = request.model_dump(mode="json", exclude_none=True, by_alias=True)
         resp = await self._request("POST", "/v3/product/list", json=payload)
-        return ProductListResponse.model_validate(resp.json())
+        resp_json = resp.json()
+        logger.info(
+            "::get_product_list",
+            request=payload,
+            response=resp_json,
+        )
+        return ProductListResponse.model_validate(resp_json)
 
     async def get_analytics_data(
         self, request: AnalyticsDataRequest
@@ -154,36 +160,73 @@ class OzonSellerClient:
         """/v1/rating/history"""
         payload = request.model_dump(mode="json", exclude_none=True)
         resp = await self._request("POST", "/v1/rating/history", json=payload)
-        return RatingHistoryResponse.model_validate(resp.json())
+        resp_json = resp.json()
+        logger.info(
+            "::get_rating_history",
+            request=payload,
+            response=resp_json,
+        )
+        return RatingHistoryResponse.model_validate(resp_json)
 
     async def get_rating_summary(self) -> RatingSummaryResponse:
         """/v1/rating/summary"""
-        resp = await self._request("POST", "/v1/rating/summary", json={})
-        return RatingSummaryResponse.model_validate(resp.json())
+        payload = {}
+        resp = await self._request("POST", "/v1/rating/summary", json=payload)
+        resp_json = resp.json()
+        logger.info(
+            "::get_rating_summary",
+            request=payload,
+            response=resp_json,
+        )
+        return RatingSummaryResponse.model_validate(resp_json)
 
     async def get_product_queries(self, request: ProductQueriesRequest) -> ProductQueriesResponse:
         """/v1/analytics/product-queries"""
         payload = request.model_dump(mode="json", exclude_none=True)
         resp = await self._request("POST", "/v1/analytics/product-queries", json=payload)
-        return ProductQueriesResponse.model_validate(resp.json())
+        resp_json = resp.json()
+        logger.info(
+            "::get_product_queries",
+            request=payload,
+            response=resp_json,
+        )
+        return ProductQueriesResponse.model_validate(resp_json)
 
     async def get_turnover_stocks(self, request: TurnoverStocksRequest) -> TurnoverStocksResponse:
         """/v1/analytics/turnover/stocks"""
         payload = request.model_dump(mode="json", exclude_none=True)
         resp = await self._request("POST", "/v1/analytics/turnover/stocks", json=payload)
-        return TurnoverStocksResponse.model_validate(resp.json())
+        resp_json = resp.json()
+        logger.info(
+            "::get_turnover_stocks",
+            request=payload,
+            response=resp_json,
+        )
+        return TurnoverStocksResponse.model_validate(resp_json)
 
     async def get_product_queries_details(
         self, request: ProductQueriesDetailsRequest
     ) -> ProductQueriesDetailsResponse:
         payload = request.model_dump(mode="json", exclude_none=True)
         resp = await self._request("POST", "/v1/analytics/product-queries/details", json=payload)
-        return ProductQueriesDetailsResponse.model_validate(resp.json())
+        resp_json = resp.json()
+        logger.info(
+            "::get_product_queries_details",
+            request=payload,
+            response=resp_json,
+        )
+        return ProductQueriesDetailsResponse.model_validate(resp_json)
 
     async def manage_stocks(self, request: ManageStocksRequest) -> ManageStocksResponse:
         payload = request.model_dump(mode="json", exclude_none=True)
         resp = await self._request("POST", "/v1/analytics/manage/stocks", json=payload)
-        return ManageStocksResponse.model_validate(resp.json())
+        resp_json = resp.json()
+        logger.info(
+            "::manage_stocks",
+            request=payload,
+            response=resp_json,
+        )
+        return ManageStocksResponse.model_validate(resp_json)
 
     async def get_finance_transaction_list(
         self, request: FinanceTransactionListRequest
@@ -191,14 +234,26 @@ class OzonSellerClient:
         """/v3/finance/transaction/list"""
         payload = request.model_dump(mode="json", exclude_none=True, by_alias=True)
         resp = await self._request("POST", "/v3/finance/transaction/list", json=payload)
-        return FinanceTransactionListResponse.model_validate(resp.json())
+        resp_json = resp.json()
+        logger.info(
+            "::get_finance_transaction_list",
+            request=payload,
+            response=resp_json,
+        )
+        return FinanceTransactionListResponse.model_validate(resp_json)
 
     async def get_finance_transaction_totals(
         self, request: FinanceTransactionTotalsRequest
     ) -> FinanceTransactionTotalsResponse:
         payload = request.model_dump(mode="json", exclude_none=True, by_alias=True)
         resp = await self._request("POST", "/v3/finance/transaction/totals", json=payload)
-        return FinanceTransactionTotalsResponse.model_validate(resp.json())
+        resp_json = resp.json()
+        logger.info(
+            "::get_finance_transaction_totals",
+            request=payload,
+            response=resp_json,
+        )
+        return FinanceTransactionTotalsResponse.model_validate(resp_json)
 
     async def create_returns_report(
         self, request: ReportReturnsCreateRequest
@@ -206,13 +261,25 @@ class OzonSellerClient:
         """/v2/report/returns/create"""
         payload = request.model_dump(mode="json", exclude_none=True)
         resp = await self._request("POST", "/v2/report/returns/create", json=payload)
-        return ReportReturnsCreateResponse.model_validate(resp.json())
+        resp_json = resp.json()
+        logger.info(
+            "::create_returns_report",
+            request=payload,
+            response=resp_json,
+        )
+        return ReportReturnsCreateResponse.model_validate(resp_json)
 
     async def get_reviews(self, request: ReviewListRequest) -> ReviewListResponse:
         """/v1/review/list"""
         payload = request.model_dump(mode="json", exclude_none=True)
         resp = await self._request("POST", "/v1/review/list", json=payload)
-        return ReviewListResponse.model_validate(resp.json())
+        resp_json = resp.json()
+        logger.info(
+            "::get_reviews",
+            request=payload,
+            response=resp_json,
+        )
+        return ReviewListResponse.model_validate(resp_json)
 
     async def get_posting_fbs_list(
         self, request: PostingFbsListRequest
@@ -220,21 +287,39 @@ class OzonSellerClient:
         """/v3/posting/fbs/list"""
         payload = request.model_dump(mode="json", exclude_none=True, by_alias=True)
         resp = await self._request("POST", "/v3/posting/fbs/list", json=payload)
-        return PostingFbsListResponse.model_validate(resp.json())
+        resp_json = resp.json()
+        logger.info(
+            "::get_posting_fbs_list",
+            request=payload,
+            response=resp_json,
+        )
+        return PostingFbsListResponse.model_validate(resp_json)
 
     async def get_posting_fbs_unfulfilled_list(
         self, request: PostingFbsUnfulfilledListRequest
     ) -> PostingFbsUnfulfilledListResponse:
         payload = request.model_dump(mode="json", exclude_none=True, by_alias=True)
         resp = await self._request("POST", "/v3/posting/fbs/unfulfilled/list", json=payload)
-        return PostingFbsUnfulfilledListResponse.model_validate(resp.json())
+        resp_json = resp.json()
+        logger.info(
+            "::get_posting_fbs_unfulfilled_list",
+            request=payload,
+            response=resp_json,
+        )
+        return PostingFbsUnfulfilledListResponse.model_validate(resp_json)
 
     async def get_product_info_stocks(
         self, request: ProductInfoStocksRequest
     ) -> ProductInfoStocksResponse:
         payload = request.model_dump(mode="json", exclude_none=True)
         resp = await self._request("POST", "/v4/product/info/stocks", json=payload)
-        return ProductInfoStocksResponse.model_validate(resp.json())
+        resp_json = resp.json()
+        logger.info(
+            "::get_product_info_stocks",
+            request=payload,
+            response=resp_json,
+        )
+        return ProductInfoStocksResponse.model_validate(resp_json)
 
     async def get_product_info_list(
         self, request: ProductInfoListRequest
@@ -242,7 +327,13 @@ class OzonSellerClient:
         """/v3/product/info/list"""
         payload = request.model_dump(mode="json", exclude_none=True)
         resp = await self._request("POST", "/v3/product/info/list", json=payload)
-        return ProductInfoListResponse.model_validate(resp.json())
+        resp_json = resp.json()
+        logger.info(
+            "::get_product_info_list",
+            request=payload,
+            response=resp_json,
+        )
+        return ProductInfoListResponse.model_validate(resp_json)
 
     async def get_product_info_prices(
         self, request: ProductInfoPricesV5Request
@@ -272,6 +363,11 @@ class OzonSellerClient:
                 collected=len(items),
             )
 
+        logger.info(
+            "::get_product_info_prices",
+            request=payload,
+            response={"items": len(items), "pages": pages},
+        )
         return ProductInfoPricesV5Response(
             cursor=cursor,
             items=items,
@@ -279,8 +375,15 @@ class OzonSellerClient:
         )
 
     async def get_warehouse_list(self) -> WarehouseListResponse:
-        resp = await self._request("POST", "/v2/warehouse/list", json={})
-        return WarehouseListResponse.model_validate(resp.json())
+        payload = {}
+        resp = await self._request("POST", "/v2/warehouse/list", json=payload)
+        resp_json = resp.json()
+        logger.info(
+            "::get_warehouse_list",
+            request=payload,
+            response=resp_json,
+        )
+        return WarehouseListResponse.model_validate(resp_json)
 
 
     async def process_full_analytics_report(self, date_from: datetime, date_to: datetime) -> pd.DataFrame:

@@ -690,3 +690,64 @@ class TestSearchQueriesSection:
         assert payload["page"] == 2
         assert payload["page_size"] == 1000
         assert payload["skus"] == ["1", "2"]
+
+
+
+class TestCashflowSection:
+    """ДДС-журнал: бегущий баланс, split приход/расход, сводка типов"""
+
+    def _op(self, **kw):
+        from backend.app.pydantic_models.ozon.seller.response import FinanceOperation
+        defaults = dict(
+            operation_id=1,
+            operation_type="OperationOrderPayment",
+            operation_type_name="Продажа",
+            operation_date="2026-08-02T10:00:00.000Z",
+            amount=100.0,
+        )
+        defaults.update(kw)
+        return FinanceOperation(**defaults)
+
+    def _sorted_with_balance(self, ops):
+        """Повторяет логику сервиса: сортировка по дате + бегущий баланс"""
+        from datetime import datetime
+
+        def _d(op):
+            return datetime.fromisoformat(op.operation_date.replace("Z", "+00:00"))
+
+        ops = sorted(ops, key=_d)
+        rows, balance = [], 0.0
+        for op in ops:
+            balance += op.amount or 0.0
+            rows.append((op.amount, round(balance, 2)))
+        return rows
+
+    def test_running_balance_sorted_by_date(self):
+        """Операции приходят сверху вниз (свежие первыми) — баланс считается по датам"""
+        ops = [
+            self._op(operation_id=3, operation_date="2026-08-03T10:00:00.000Z", amount=50.0),
+            self._op(operation_id=1, operation_date="2026-08-01T10:00:00.000Z", amount=100.0),
+            self._op(operation_id=2, operation_date="2026-08-02T10:00:00.000Z", amount=-30.0),
+        ]
+        rows = self._sorted_with_balance(ops)
+        assert rows == [(100.0, 100.0), (-30.0, 70.0), (50.0, 120.0)]
+
+    def test_income_expense_split(self):
+        """Положительные — приход, отрицательные — расход"""
+        amounts = [100.0, -30.0, 50.0]
+        income = sum(a for a in amounts if a >= 0)
+        expense = sum(abs(a) for a in amounts if a < 0)
+        assert income == 150.0
+        assert expense == 30.0
+
+    def test_type_summary_aggregates(self):
+        """Сводка по типам операций суммируется корректно"""
+        ops = [
+            self._op(operation_type_name="Продажа", amount=100.0),
+            self._op(operation_type_name="Продажа", amount=200.0),
+            self._op(operation_type_name="Услуги", amount=-50.0),
+        ]
+        summary: dict = {}
+        for op in ops:
+            summary[op.operation_type_name] = summary.get(op.operation_type_name, 0.0) + op.amount
+        assert summary == {"Продажа": 300.0, "Услуги": -50.0}

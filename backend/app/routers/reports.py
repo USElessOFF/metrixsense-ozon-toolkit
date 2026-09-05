@@ -25,7 +25,9 @@ from backend.app.pydantic_models.reports import (
     ReportRequest,
     ReportStatusResponse,
 )
+from backend.app.pydantic_models.top_actions import TopActionsRequest, TopActionsResponse
 from backend.app.services.report_service import ReportService
+from backend.app.services.top_actions import TopActionsService
 
 logger = structlog.get_logger(__name__)
 
@@ -185,6 +187,25 @@ def get_reports_router() -> APIRouter:
         except Exception as e:
             logger.error("Cashflow section failed", error=str(e))
             raise HTTPException(status_code=_http_status(e), detail=str(e))
+
+    @router.post(
+        "/top-actions",
+        response_model=TopActionsResponse,
+    )
+    async def get_top_actions(
+        body: TopActionsRequest | None = None,
+        seller: OzonSellerClient = Depends(get_ozon_seller_client),  # noqa: B008
+        db: MetrixAdapter = Depends(get_metrix_adapter_for_user),  # noqa: B008
+    ) -> TopActionsResponse:
+        """Агрегированные действия: остатки, замороженный сток, дорогие расходы, спрос без продаж"""
+        service = TopActionsService(db)
+        try:
+            return await service.get_top_actions(
+                seller, body or TopActionsRequest()
+            )
+        except Exception as e:
+            logger.error("Top actions failed", error=str(e))
+            raise HTTPException(status_code=400, detail=str(e))
 
     # /requests/ — от коллизий с /sections/*
     @router.get(

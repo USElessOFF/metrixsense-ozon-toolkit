@@ -35,7 +35,7 @@ Write-Host "=============================================" -ForegroundColor Cyan
 function Find-Python {
     $candidates = New-Object System.Collections.Generic.List[string]
     if (Get-Command py -ErrorAction SilentlyContinue) {
-        $candidates.Add("py -3.13"); $candidates.Add("py -3.12"); $candidates.Add("py -3.11")
+        $candidates.Add("py -3.14"); $candidates.Add("py -3.13"); $candidates.Add("py -3.12")
     }
     $candidates.Add("python"); $candidates.Add("python3")
     foreach ($cand in $candidates) {
@@ -46,7 +46,7 @@ function Find-Python {
             $out = & $parts[0] @preArgs -c "import sys;print('%d.%d' % sys.version_info[:2])" 2>$null
             if ($LASTEXITCODE -eq 0 -and "$out" -match '^\s*(\d+)\.(\d+)\s*$') {
                 $maj = [int]$Matches[1]; $min = [int]$Matches[2]
-                if ($maj -eq 3 -and $min -ge 11) {
+                if ($maj -eq 3 -and $min -ge 12) {
                     return @{ Exe = $parts[0]; PreArgs = $preArgs; Version = "$maj.$min" }
                 }
             }
@@ -55,22 +55,22 @@ function Find-Python {
     return $null
 }
 
-Write-Step "Step 1/5: Python 3.11+"
+Write-Step "Step 1/5: Python 3.12+"
 $python = Find-Python
 if (-not $python) {
-    Write-Host "    Python 3.11+ not found. Installing..."
+    Write-Host "    Python 3.12+ not found. Installing..."
     $installed = $false
     if (Get-Command winget -ErrorAction SilentlyContinue) {
         try {
-            winget install --id Python.Python.3.11 -e --silent --accept-package-agreements --accept-source-agreements | Out-Null
+            winget install --id Python.Python.3.13 -e --silent --accept-package-agreements --accept-source-agreements | Out-Null
             $installed = $true
         } catch { Write-Warn2 "winget install failed: $($_.Exception.Message)" }
     } else {
         Write-Warn2 "winget is not available - using direct download from python.org"
     }
     if (-not $installed) {
-        $pyExe = "$env:TEMP\python-3.11.9-amd64.exe"
-        Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe" -OutFile $pyExe -UseBasicParsing
+        $pyExe = "$env:TEMP\python-3.13.1-amd64.exe"
+        Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.13.1/python-3.13.1-amd64.exe" -OutFile $pyExe -UseBasicParsing
         Start-Process -Wait -FilePath $pyExe -ArgumentList "/quiet","InstallAllUsers=0","PrependPath=1","Include_test=0"
         Remove-Item $pyExe -Force -ErrorAction SilentlyContinue
     }

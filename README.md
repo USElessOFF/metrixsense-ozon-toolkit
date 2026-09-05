@@ -7,7 +7,7 @@
 [![CI](https://github.com/USElessOFF/metrixsense-ozon-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/USElessOFF/metrixsense-ozon-toolkit/actions/workflows/ci.yml)
 [![Release](https://github.com/USElessOFF/metrixsense-ozon-toolkit/actions/workflows/release.yml/badge.svg)](https://github.com/USElessOFF/metrixsense-ozon-toolkit/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](backend/requirements.txt)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](backend/requirements.txt)
 [![Docker Compose](https://img.shields.io/badge/docker-compose-2496ED.svg)](docker-compose.yml)
 
 Открытая альтернатива платным сервисам: полные метрики магазина
@@ -135,11 +135,11 @@ uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
 
 | Компонент | Технологии |
 |---|---|
-| Backend | Python 3.11+, FastAPI, SQLAlchemy 2 (async), Alembic, httpx, structlog, pandas |
+| Backend | Python 3.12+, FastAPI, SQLAlchemy 2 (async), Alembic, httpx, structlog, pandas |
 | База данных | SQLite (WAL) — нулевая настройка; схема через Alembic-миграции |
 | Frontend | Статика в `web/` |
 | Расширение | Chrome MV3 (`extension-metrixsense`) |
-| CI/CD | GitHub Actions: тесты (py3.11/3.12) + ruff + docker build; релизы — ghcr.io |
+| CI/CD | GitHub Actions: тесты (py3.12/3.13) + ruff + docker build; релизы — ghcr.io |
 
 Слои backend: `app/routers` (HTTP) → `app/services/report_service` (сборка отчётов)
 → `app/ozon_seller`, `app/ozon_performance` (клиенты Ozon API) → `app/adapters`

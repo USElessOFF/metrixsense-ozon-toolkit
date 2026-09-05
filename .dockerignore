@@ -1,0 +1,34 @@
+# VCS
+.git/
+.gitignore
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# IDE / AI tools
+.vscode/
+.idea/
+.claude/
+.cursor/
+.kimi/
+.codegeex/
+
+# Local data & runtime artifacts (contain user data — must not be baked into image)
+backend/data/
+backend/files/
+backend/logs/
+backend/.env
+.env
+
+# Docs & repo meta
+docs/
+README.md
+LICENSE
+.github/

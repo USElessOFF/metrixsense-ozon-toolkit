@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MetrixSense — аналитика для продавцов Ozon</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #0e7490 130%);
+      color: #e2e8f0;
+      padding: 24px;
+    }
+    main { max-width: 520px; width: 100%; }
+    .logo { font-size: 2.4rem; font-weight: 800; letter-spacing: -0.5px; }
+    .logo span { color: #22d3ee; }
+    .tagline { margin: 8px 0 28px; color: #94a3b8; }
+    .card {
+      background: rgba(15, 23, 42, .72);
+      border: 1px solid rgba(148, 163, 184, .18);
+      border-radius: 14px;
+      padding: 24px;
+      backdrop-filter: blur(6px);
+    }
+    .status {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: .9rem;
+      background: rgba(148,163,184,.15);
+      margin-bottom: 16px;
+    }
+    .status.ok { background: rgba(34,197,94,.16); color: #4ade80; }
+    .status.err { background: rgba(239,68,68,.16); color: #f87171; }
+    .card p { margin-bottom: 10px; color: #cbd5e1; }
+    .card ul { list-style: none; }
+    .card li { margin: 8px 0; }
+    a { color: #22d3ee; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .hint { margin-top: 20px; font-size: .85rem; color: #64748b; }
+    code { background: rgba(148,163,184,.15); padding: 2px 6px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="logo">Metrix<span>Sense</span></div>
+    <p class="tagline">Бесплатная аналитика юнит-экономики для продавцов Ozon</p>
+    <div class="card">
+      <div class="status" id="status">Проверка состояния API…</div>
+      <p>Веб-интерфейс находится в разработке. Сейчас доступны:</p>
+      <ul>
+        <li>→ <a href="/docs">API-документация (Swagger UI)</a></li>
+        <li>→ <a href="/redoc">API-документация (ReDoc)</a></li>
+      </ul>
+    </div>
+    <p class="hint">
+      Учётная запись по умолчанию: <code>metrixsense</code> / <code>metrixsense</code> —
+      смените пароль в <code>backend/.env</code>.
+    </p>
+  </main>
+  <script>
+    (async () => {
+      const el = document.getElementById('status');
+      try {
+        const r = await fetch('/health', { cache: 'no-store' });
+        el.textContent = r.ok ? '● API работает' : '● API отвечает с ошибкой ' + r.status;
+        el.className = 'status ' + (r.ok ? 'ok' : 'err');
+      } catch {
+        el.textContent = '● API недоступен';
+        el.className = 'status err';
+      }
+    })();
+  </script>
+</body>
+</html>

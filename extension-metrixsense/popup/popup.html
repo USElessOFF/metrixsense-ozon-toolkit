@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MetrixSense</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Шапка с логотипом -->
+    <div class="header">
+      <div class="logo">
+        <span class="logo-icon">📊</span>
+        <span class="logo-text">
+          <span class="logo-m">M</span>etrix<span class="logo-sense">Sense</span>
+        </span>
+        <span class="badge">BETA</span>
+      </div>
+    </div>
+
+    <!-- Статус подключения -->
+    <div class="status-container">
+      <div id="connectionStatus" class="status checking">
+        <span class="status-dot"></span>
+        <span class="status-text">Проверка подключения...</span>
+      </div>
+    </div>
+
+    <!-- Основные настройки -->
+    <div class="settings">
+      <div class="settings-title">⚙️ Настройки</div>
+
+      <!-- Система налогообложения -->
+      <div class="setting-group">
+        <label class="setting-label" for="taxSystem">
+          Система налогообложения
+        </label>
+        <select id="taxSystem" class="setting-select">
+          <option value="usn_6">УСН 6% (доходы)</option>
+          <option value="usn_15">УСН 15% (доходы-расходы)</option>
+          <option value="osn">ОСН (20% НДС)</option>
+          <option value="patent">Патентная система</option>
+        </select>
+      </div>
+
+      <!-- Бюджет на рекламу -->
+      <div class="setting-group">
+        <label class="setting-label" for="adBudget">
+          Бюджет на рекламу
+          <span class="setting-hint">% от выручки</span>
+        </label>
+        <div class="input-with-suffix">
+          <input type="number" id="adBudget" class="setting-input" 
+                 min="0" max="100" step="1" value="5">
+          <span class="input-suffix">%</span>
+        </div>
+      </div>
+
+      <!-- Логистика -->
+      <div class="setting-group">
+        <label class="setting-label" for="logisticsCost">
+          Средняя стоимость логистики
+          <span class="setting-hint">за 1 заказ</span>
+        </label>
+        <div class="input-with-suffix">
+          <input type="number" id="logisticsCost" class="setting-input" 
+                 min="0" step="50" value="150">
+          <span class="input-suffix">₽</span>
+        </div>
+      </div>
+
+      <!-- Складская схема -->
+      <div class="setting-group">
+        <label class="setting-label" for="fbo">
+          Схема работы
+        </label>
+        <select id="fbo" class="setting-select">
+          <option value="false">FBS (продавец отгружает)</option>
+          <option value="true">FBO (Ozon хранит и отгружает)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Кнопки действий -->
+    <div class="actions">
+      <button id="saveSettings" class="btn btn-primary">
+        💾 Сохранить настройки
+      </button>
+      <button id="openDashboard" class="btn btn-secondary">
+        📊 Открыть дашборд
+      </button>
+    </div>
+
+    <!-- Информация о системе -->
+    <div class="footer">
+      <div class="footer-row">
+        <span class="footer-label">Бэкенд</span>
+        <span class="footer-value" id="backendUrl">http://localhost:8000</span>
+      </div>
+      <div class="footer-row">
+        <span class="footer-label">Версия</span>
+        <span class="footer-value">v1.0.0</span>
+      </div>
+      <div class="footer-divider"></div>
+      <div class="footer-note">
+        🔒 Все данные хранятся локально
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

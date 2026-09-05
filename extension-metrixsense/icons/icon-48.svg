@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <defs>
+    <linearGradient id="bgGrad48" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a5fb4"/>
+      <stop offset="100%" style="stop-color:#0a1628"/>
+    </linearGradient>
+    <linearGradient id="chartGrad48" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#8ab4f8"/>
+      <stop offset="100%" style="stop-color:#ffffff"/>
+    </linearGradient>
+    <filter id="shadow48">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+    <filter id="glow48">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <rect width="48" height="48" rx="10" fill="url(#bgGrad48)" filter="url(#shadow48)"/>
+  
+  <!-- График -->
+  <path d="M8 36 L14 28 L22 32 L30 20 L38 24 L40 36 L8 36Z" 
+        fill="url(#chartGrad48)" opacity="0.12"/>
+  <path d="M8 36 L14 28 L22 32 L30 20 L38 24" 
+        fill="none" stroke="url(#chartGrad48)" stroke-width="2.5" 
+        stroke-linecap="round" stroke-linejoin="round" filter="url(#glow48)"/>
+  
+  <!-- Точки на графике -->
+  <circle cx="14" cy="28" r="2" fill="#ffffff" filter="url(#glow48)"/>
+  <circle cx="30" cy="20" r="2" fill="#ffffff" filter="url(#glow48)"/>
+  
+  <!-- Буква M -->
+  <text x="16" y="19" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="900" 
+        fill="white" opacity="0.95">
+    M
+  </text>
+  
+  <!-- Маленькая точка-акцент -->
+  <circle cx="40" cy="36" r="1.5" fill="#8ab4f8" opacity="0.5"/>
+</svg>

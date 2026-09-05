@@ -1,0 +1,27 @@
+version: 2
+updates:
+  # Python: minor/patch — одной пачкой, мажорные версии — отдельным PR
+  - package-ecosystem: pip
+    directory: "/backend"
+    schedule:
+      interval: weekly
+    groups:
+      python-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # GitHub Actions: все обновления в одном PR
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      actions-all:
+        patterns: ["*"]
+
+  # Uncomment when the web frontend (package.json) is added:
+  # - package-ecosystem: npm
+  #   directory: "/web"
+  #   schedule:
+  #     interval: weekly

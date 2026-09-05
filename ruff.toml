@@ -1,0 +1,13 @@
+# Ruff configuration (light, non-intrusive)
+line-length = 100
+target-version = "py311"
+extend-exclude = [".venv", "web", "backend/alembic/versions"]
+
+[lint]
+# Keep CI green while still catching real errors:
+# undefined names, syntax errors, f-strings without placeholders, etc.
+select = ["E4", "E7", "E9", "F"]
+
+[lint.per-file-ignores]
+# conftest: переменные окружения задаются до импортов (settings читает их при импорте)
+"backend/tests/conftest.py" = ["E402"]

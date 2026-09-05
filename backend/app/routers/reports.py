@@ -1,0 +1,148 @@
+"""Отчёты: полный, статус, секции"""
+
+from __future__ import annotations
+
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from backend.app.adapters.metrix_adapter import MetrixAdapter
+from backend.app.depends.db import get_metrix_adapter_for_user
+from backend.app.depends.ozon import get_ozon_seller_client
+from backend.app.exceptions import CircuitOpenError, SettingsError
+from backend.app.ozon_seller import OzonSellerClient
+from backend.app.pydantic_models.report_sections import (
+    FinanceExpensesSectionResponse,
+    PricesCommissionsSectionResponse,
+    ProductCardsSectionResponse,
+    SellerRatingSectionResponse,
+)
+from backend.app.pydantic_models.reports import (
+    CreatedReportResponse,
+    ProductCardsRequest,
+    ReportRequest,
+    ReportStatusResponse,
+)
+from backend.app.services.report_service import ReportService
+
+logger = structlog.get_logger(__name__)
+
+
+def _http_status(exc: Exception) -> int:
+    """Настройки → 422, предохранитель → 503, остальное → 400"""
+    if isinstance(exc, SettingsError):
+        return status.HTTP_422_UNPROCESSABLE_ENTITY
+    if isinstance(exc, CircuitOpenError):
+        return status.HTTP_503_SERVICE_UNAVAILABLE
+    return status.HTTP_400_BAD_REQUEST
+
+
+def get_reports_router() -> APIRouter:
+    router = APIRouter(prefix="/api/reports", tags=["reports"])
+
+    @router.post(
+        "/full",
+        status_code=status.HTTP_202_ACCEPTED,
+    )
+    async def create_full_report(
+        data: ReportRequest,
+        db: MetrixAdapter = Depends(get_metrix_adapter_for_user),  # noqa: B008
+    ) -> CreatedReportResponse:
+        """Создать полный отчёт"""
+        service = ReportService(db)
+        try:
+            report_request = await service.create_report_full_report(data.date_from, data.date_to)
+        except SettingsError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        except Exception as e:
+            logger.error("Report creation failed", error=str(e))
+            raise HTTPException(status_code=400, detail=str(e))
+        return CreatedReportResponse.model_validate(report_request, from_attributes=True)
+
+    # Секции: синхронные блоки для веба, DI-клиент на запрос
+
+    @router.get(
+        "/sections/prices-commissions",
+        response_model=PricesCommissionsSectionResponse,
+    )
+    async def get_prices_commissions(
+        seller: OzonSellerClient = Depends(get_ozon_seller_client),  # noqa: B008
+        db: MetrixAdapter = Depends(get_metrix_adapter_for_user),  # noqa: B008
+    ) -> PricesCommissionsSectionResponse:
+        """Цены и комиссии Ozon по товарам (/v5/product/info/prices)"""
+        service = ReportService(db)
+        try:
+            return await service.get_prices_commissions_section(seller)
+        except Exception as e:
+            logger.error("Prices/commissions section failed", error=str(e))
+            raise HTTPException(status_code=_http_status(e), detail=str(e))
+
+    @router.post(
+        "/sections/product-cards",
+        response_model=ProductCardsSectionResponse,
+    )
+    async def get_product_cards(
+        body: ProductCardsRequest | None = None,
+        seller: OzonSellerClient = Depends(get_ozon_seller_client),  # noqa: B008
+        db: MetrixAdapter = Depends(get_metrix_adapter_for_user),  # noqa: B008
+    ) -> ProductCardsSectionResponse:
+        """Карточки товаров: комиссии, объёмный вес, цены (/v3/product/info/list)"""
+        service = ReportService(db)
+        try:
+            sku_list = body.sku if body else None
+            return await service.get_product_cards_section(seller, sku_list)
+        except Exception as e:
+            logger.error("Product cards section failed", error=str(e))
+            raise HTTPException(status_code=_http_status(e), detail=str(e))
+
+    @router.post(
+        "/sections/finance-expenses",
+        response_model=FinanceExpensesSectionResponse,
+    )
+    async def get_finance_expenses(
+        data: ReportRequest,
+        seller: OzonSellerClient = Depends(get_ozon_seller_client),  # noqa: B008
+        db: MetrixAdapter = Depends(get_metrix_adapter_for_user),  # noqa: B008
+    ) -> FinanceExpensesSectionResponse:
+        """Финансовые начисления по отправлениям (/v3/finance/transaction/list + totals)"""
+        service = ReportService(db)
+        try:
+            return await service.get_finance_expenses_section(
+                seller, data.date_from, data.date_to
+            )
+        except Exception as e:
+            logger.error("Finance expenses section failed", error=str(e))
+            raise HTTPException(status_code=_http_status(e), detail=str(e))
+
+    @router.get(
+        "/sections/seller-rating",
+        response_model=SellerRatingSectionResponse,
+    )
+    async def get_seller_rating(
+        seller: OzonSellerClient = Depends(get_ozon_seller_client),  # noqa: B008
+        db: MetrixAdapter = Depends(get_metrix_adapter_for_user),  # noqa: B008
+    ) -> SellerRatingSectionResponse:
+        """Рейтинг продавца (/v1/rating/summary)"""
+        service = ReportService(db)
+        try:
+            return await service.get_seller_rating_section(seller)
+        except Exception as e:
+            logger.error("Seller rating section failed", error=str(e))
+            raise HTTPException(status_code=_http_status(e), detail=str(e))
+
+    # /requests/ — от коллизий с /sections/*
+    @router.get(
+        "/requests/{request_id}",
+        response_model=ReportStatusResponse,
+    )
+    async def get_report_status(
+        request_id: str,
+        db: MetrixAdapter = Depends(get_metrix_adapter_for_user),  # noqa: B008
+    ) -> ReportStatusResponse:
+        """Статус отчёта"""
+        service = ReportService(db)
+        report = await service.get_report(request_id)
+        if report is None:
+            raise HTTPException(status_code=404, detail="Report not found")
+        return ReportStatusResponse.model_validate(report, from_attributes=True)
+
+    return router

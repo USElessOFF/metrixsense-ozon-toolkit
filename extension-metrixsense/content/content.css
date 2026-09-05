@@ -1,0 +1,411 @@
+/* ========================================
+   MetrixSense - Стили для виджетов на Ozon
+   ======================================== */
+
+/* Основной контейнер виджета */
+#metrix-sense-widget {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 360px;
+  max-height: 520px;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.06);
+  z-index: 99999;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
+}
+
+/* Анимация появления */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+#metrix-sense-widget.visible {
+  animation: slideInRight 0.3s ease-out forwards;
+}
+
+#metrix-sense-widget.hidden {
+  display: none;
+}
+
+/* Шапка виджета */
+.metrix-widget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px 12px 20px;
+  background: linear-gradient(135deg, #0a1628 0%, #1a2a4a 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.metrix-widget-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  color: #ffffff;
+  letter-spacing: 0.3px;
+}
+
+.metrix-widget-title .badge {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 9px;
+  font-weight: 600;
+  color: #8ab4f8;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.metrix-close-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.2s;
+  line-height: 1;
+}
+
+.metrix-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+/* Тело виджета */
+.metrix-widget-body {
+  padding: 16px 20px 20px 20px;
+  background: #f8faff;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* Скроллбар для тела */
+.metrix-widget-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.metrix-widget-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.metrix-widget-body::-webkit-scrollbar-thumb {
+  background: #c4d0e0;
+  border-radius: 4px;
+}
+
+/* Загрузчик */
+.metrix-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0;
+  gap: 12px;
+}
+
+.metrix-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e8edf5;
+  border-top-color: #1a5fb4;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.metrix-loader-text {
+  font-size: 13px;
+  color: #6b7a8f;
+  font-weight: 500;
+}
+
+/* Сетка метрик */
+.metrix-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.metrix-card {
+  background: #ffffff;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #edf2f9;
+  transition: all 0.2s;
+}
+
+.metrix-card:hover {
+  border-color: #d0dcee;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.metrix-card-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #8a9bb0;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.metrix-card-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0a1628;
+  line-height: 1.2;
+}
+
+.metrix-card-value .currency {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8a9bb0;
+  margin-left: 2px;
+}
+
+/* Цветовые варианты для карточек */
+.metrix-card.green .metrix-card-value {
+  color: #0d9488;
+}
+
+.metrix-card.orange .metrix-card-value {
+  color: #ea580c;
+}
+
+.metrix-card.blue .metrix-card-value {
+  color: #2563eb;
+}
+
+.metrix-card.red .metrix-card-value {
+  color: #dc2626;
+}
+
+.metrix-card.purple .metrix-card-value {
+  color: #7c3aed;
+}
+
+/* Блок с дополнительной аналитикой */
+.metrix-additional {
+  margin-top: 12px;
+  background: #ffffff;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #edf2f9;
+}
+
+.metrix-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.metrix-row:not(:last-child) {
+  border-bottom: 1px solid #f0f4fc;
+}
+
+.metrix-row-label {
+  color: #6b7a8f;
+}
+
+.metrix-row-value {
+  font-weight: 600;
+  color: #0a1628;
+}
+
+.metrix-row-value.positive {
+  color: #0d9488;
+}
+
+.metrix-row-value.negative {
+  color: #dc2626;
+}
+
+/* Прогресс-бар маржинальности */
+.metrix-progress-bar {
+  margin-top: 8px;
+  height: 4px;
+  background: #edf2f9;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.metrix-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s ease;
+  background: linear-gradient(90deg, #dc2626, #ea580c, #0d9488);
+}
+
+/* Футер виджета */
+.metrix-widget-footer {
+  padding: 10px 20px 12px 20px;
+  background: #ffffff;
+  border-top: 1px solid #edf2f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.metrix-widget-footer .hint {
+  font-size: 10px;
+  color: #8a9bb0;
+  letter-spacing: 0.2px;
+}
+
+.metrix-widget-footer .hint strong {
+  color: #0a1628;
+  font-weight: 600;
+}
+
+.metrix-status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+
+.metrix-status-dot.online {
+  background: #0d9488;
+  box-shadow: 0 0 8px rgba(13, 148, 136, 0.4);
+}
+
+.metrix-status-dot.offline {
+  background: #dc2626;
+  box-shadow: 0 0 8px rgba(220, 38, 38, 0.3);
+}
+
+/* Состояние ошибки */
+.metrix-error {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.metrix-error-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.metrix-error-text {
+  font-size: 13px;
+  color: #6b7a8f;
+  margin-bottom: 4px;
+}
+
+.metrix-error-hint {
+  font-size: 11px;
+  color: #8a9bb0;
+}
+
+.metrix-retry-btn {
+  margin-top: 12px;
+  padding: 6px 20px;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.metrix-retry-btn:hover {
+  background: #1d4ed8;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 640px) {
+  #metrix-sense-widget {
+    bottom: 12px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: 460px;
+  }
+  
+  .metrix-grid {
+    gap: 8px;
+  }
+  
+  .metrix-card {
+    padding: 10px 12px;
+  }
+  
+  .metrix-card-value {
+    font-size: 16px;
+  }
+}
+
+/* Темная тема (поддержка если пользователь включил темную тему в браузере) */
+@media (prefers-color-scheme: dark) {
+  #metrix-sense-widget {
+    background: #1a2332;
+    border-color: rgba(255, 255, 255, 0.06);
+  }
+  
+  .metrix-widget-body {
+    background: #141c2a;
+  }
+  
+  .metrix-card {
+    background: #1f2a3e;
+    border-color: #2a3650;
+  }
+  
+  .metrix-card:hover {
+    border-color: #3a4a6a;
+  }
+  
+  .metrix-card-value {
+    color: #e8edf5;
+  }
+  
+  .metrix-additional {
+    background: #1f2a3e;
+    border-color: #2a3650;
+  }
+  
+  .metrix-row {
+    border-color: #2a3650;
+  }
+  
+  .metrix-row-value {
+    color: #e8edf5;
+  }
+  
+  .metrix-widget-footer {
+    background: #1a2332;
+    border-color: #2a3650;
+  }
+  
+  .metrix-loader-text {
+    color: #8a9bb0;
+  }
+  
+  .metrix-card-label {
+    color: #6b7a8f;
+  }
+}

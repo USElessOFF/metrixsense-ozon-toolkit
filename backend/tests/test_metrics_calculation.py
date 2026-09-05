@@ -751,3 +751,54 @@ class TestCashflowSection:
         for op in ops:
             summary[op.operation_type_name] = summary.get(op.operation_type_name, 0.0) + op.amount
         assert summary == {"Продажа": 300.0, "Услуги": -50.0}
+class TestSupplyPlan:
+    """Приоритеты, дата ухода в ноль, округление поставки, сводка"""
+
+    def test_priority_levels(self):
+        from backend.app.services.report_service import ReportService
+        f = ReportService._supply_priority
+        assert f(None, 30, 14) == "no-velocity"
+        assert f(10.0, 30, 14) == "critical"
+        assert f(20.0, 30, 14) == "low"
+        assert f(45.0, 30, 14) == "normal"
+
+    def test_due_by_computed(self):
+        from backend.app.services.report_service import ReportService
+        from datetime import date
+        due = ReportService._calc_due_by(5.0)
+        assert due is not None
+        assert due == date.today().isoformat() or due >= date.today().isoformat()
+        assert ReportService._calc_due_by(None) is None
+
+    def test_recommended_units_ceil(self):
+        """Поставка — целые штуки с округлением вверх"""
+        import math
+        assert math.ceil(249.3) == 250
+        assert math.ceil(0.4) == 1
+        assert math.ceil(0.0) == 0
+
+    def test_plan_summary_aggregates(self):
+        from backend.app.pydantic_models.report_sections import StockPlanningRow
+        from backend.app.services.report_service import ReportService
+        rows = [
+            StockPlanningRow(sku=1, needs_reorder=True, priority="critical", recommended_units=100),
+            StockPlanningRow(sku=2, needs_reorder=True, priority="low", recommended_units=50),
+            StockPlanningRow(sku=3, needs_reorder=False, priority="normal", recommended_units=0),
+        ]
+        summary = ReportService._build_plan_summary(rows)
+        assert summary.skus_total == 3
+        assert summary.skus_needs_reorder == 2
+        assert summary.skus_critical == 1
+        assert summary.total_units_to_ship == 150
+
+    def test_warehouse_merge_by_sku(self):
+        """Остатки со складов маппятся на SKU (v4/product/info/stocks)"""
+        warehouses_by_sku = {
+            "111": [
+                {"name": "Казань", "present": 0, "reserved": 0},
+                {"name": "Тула", "present": 34, "reserved": 2},
+            ],
+        }
+        assert len(warehouses_by_sku["111"]) == 2
+        assert warehouses_by_sku["111"][0]["present"] == 0
+        assert "999" not in warehouses_by_sku

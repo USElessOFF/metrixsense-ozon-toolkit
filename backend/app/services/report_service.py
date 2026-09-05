@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import math
 import io
 import json
 from datetime import datetime, timedelta, timezone
@@ -52,6 +53,7 @@ from backend.app.pydantic_models.ozon.seller.request import (
     FinanceTransactionTotalsRequest,
     ProductInfoListRequest,
     ProductInfoPricesV5Request,
+    ProductInfoStocksRequest,
 )
 from backend.app.pydantic_models.ozon.seller.response import (
     AnalyticsStocksResponse,
@@ -69,10 +71,12 @@ from backend.app.pydantic_models.report_sections import (
     SellerRatingSectionResponse,
     CashFlowRow,
     CashFlowSectionResponse,
+    PlanSummary,
     SearchQueryRow,
     SearchQueriesSectionResponse,
     StockPlanningRow,
     StockPlanningSectionResponse,
+    StockWarehouseRow,
 )
 from backend.app.tax import INCOME_MINUS_EXPENSE_SYSTEMS, get_tax_rate
 
@@ -424,16 +428,43 @@ class ReportService:
         cards = await seller.get_product_info_list(ProductInfoListRequest(limit=1000))
         skus = [str(item.sku) for item in cards.items if item.sku]
         if not skus:
-            empty = StockPlanningSectionResponse(section="stock_planning", generated_at=generated_at, row_count=0, data=[])
+            empty = StockPlanningSectionResponse(
+                section="stock_planning",
+                generated_at=generated_at,
+                row_count=0,
+                data=[],
+            )
             await self._cache_section_payload("stock_planning", empty.model_dump(mode="json"), cache_key=cache_key)
             return empty
 
+        warehouses_by_sku: dict[str, list[StockWarehouseRow]] = {}
+        page = 1
+        while page <= 50:
+            stocks_resp = await seller.get_product_info_stocks(
+                ProductInfoStocksRequest(page=page, page_size=1000)
+            )
+            for stock_item in stocks_resp.items:
+                for st in stock_item.stocks:
+                    key = str(st.sku) if st.sku is not None else str(stock_item.product_id)
+                    warehouses_by_sku.setdefault(key, []).append(
+                        StockWarehouseRow(name=st.warehouse_name, present=st.present, reserved=st.reserved)
+                    )
+            if not stocks_resp.items:
+                break
+            page += 1
+
         rows: list[StockPlanningRow] = []
-        for sku in self.pd_util.split_list(skus, max_length=10):
-            resp = await seller.get_turnover_stocks(TurnoverStocksRequest(skus=sku))
+        for sku_batch in self.pd_util.split_list(skus, max_length=10):
+            resp = await seller.get_turnover_stocks(TurnoverStocksRequest(skus=sku_batch))
             for item in resp.items:
                 calc = self._calc_stock_recommendation(
                     item, target_days=settings.STOCK_TARGET_DAYS, critical_days=settings.STOCK_CRITICAL_DAYS
+                )
+                days_of_stock = (
+                    round(calc["days_of_stock"], 1) if calc["days_of_stock"] is not None else None
+                )
+                recommended_units = (
+                    math.ceil(calc["recommended_stock"]) if calc["recommended_stock"] is not None else None
                 )
                 rows.append(
                     StockPlanningRow(
@@ -442,12 +473,20 @@ class ReportService:
                         offer_id=item.offer_id,
                         current_stock=item.current_stock,
                         ads=item.ads,
-                        days_of_stock=round(calc["days_of_stock"], 1) if calc["days_of_stock"] is not None else None,
+                        days_of_stock=days_of_stock,
                         idc=item.idc,
                         idc_grade=item.idc_grade,
                         turnover=item.turnover,
                         recommended_stock=round(calc["recommended_stock"], 1) if calc["recommended_stock"] is not None else None,
+                        recommended_units=recommended_units,
                         needs_reorder=calc["needs_reorder"],
+                        priority=self._supply_priority(
+                            calc["days_of_stock"],
+                            settings.STOCK_TARGET_DAYS,
+                            settings.STOCK_CRITICAL_DAYS,
+                        ),
+                        due_by=self._calc_due_by(calc["days_of_stock"]),
+                        warehouses=warehouses_by_sku.get(str(item.sku), []),
                     )
                 )
 
@@ -457,10 +496,38 @@ class ReportService:
             row_count=len(rows),
             target_days=settings.STOCK_TARGET_DAYS,
             critical_days=settings.STOCK_CRITICAL_DAYS,
+            plan_summary=self._build_plan_summary(rows),
             data=rows,
         )
         await self._cache_section_payload("stock_planning", payload.model_dump(mode="json"), cache_key=cache_key)
         return payload
+
+    @staticmethod
+    def _supply_priority(days_of_stock: float | None, target_days: int, critical_days: int) -> str:
+        if days_of_stock is None:
+            return "no-velocity"
+        if days_of_stock < critical_days:
+            return "critical"
+        if days_of_stock < target_days:
+            return "low"
+        return "normal"
+
+    @staticmethod
+    def _calc_due_by(days_of_stock: float | None) -> str | None:
+        if days_of_stock is None:
+            return None
+        due = datetime.now(tz=timezone.utc) + timedelta(days=days_of_stock)
+        return due.date().isoformat()
+
+    @staticmethod
+    def _build_plan_summary(rows: list[StockPlanningRow]) -> PlanSummary:
+        return PlanSummary(
+            skus_total=len(rows),
+            skus_needs_reorder=sum(1 for r in rows if r.needs_reorder),
+            skus_critical=sum(1 for r in rows if r.priority == "critical"),
+            total_units_to_ship=sum(r.recommended_units or 0 for r in rows if r.recommended_units),
+        )
+
 
     async def get_search_queries_section(
         self, seller: OzonSellerClient, date_from: str, date_to: str

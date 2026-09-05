@@ -112,6 +112,11 @@ class OzonPerformanceClient:
     async def get_campaign_daily_stats(self, data: DailyStatsQueryParams) -> StatisticsReport:
         params = data.to_query_params()
         resp = (await self._request("GET", "/api/client/statistics/daily", params=params)).json()
+        logger.info(
+            "::get_campaign_daily_stats",
+            request=params,
+            response=resp,
+        )
         return StatisticsReport.model_validate(resp)
     
     async def get_campaign_daily_stats_buffer(self, data: DailyStatsQueryParams) -> io.BytesIO:

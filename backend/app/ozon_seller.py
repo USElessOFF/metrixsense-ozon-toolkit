@@ -25,6 +25,7 @@ from backend.app.pydantic_models.ozon.seller.request import (
     PostingFbsListRequest,
     PostingFbsUnfulfilledListRequest,
     ProductInfoListRequest,
+    ProductInfoPricesV5Filter,
     ProductInfoPricesV5Request,
     ProductInfoStocksRequest,
     ProductListRequest,
@@ -373,6 +374,37 @@ class OzonSellerClient:
             items=items,
             total=first_page.total if first_page.total is not None else len(items),
         )
+
+    async def get_product_info_prices_from_sku(self, sku: int | str) -> dict[str, Any] | None:
+        """Цены и комиссии одного товара по SKU (sku -> product_id -> /v5/prices)"""
+        info = await self.get_product_info_list(ProductInfoListRequest(sku=[sku]))
+        if not info.items or info.items[0].product_id is None:
+            return None
+        product_id = info.items[0].product_id
+        resp = await self.get_product_info_prices(
+            ProductInfoPricesV5Request(
+                filter=ProductInfoPricesV5Filter(product_id=[product_id])
+            )
+        )
+        if not resp.items:
+            return None
+        item = resp.items[0]
+        commissions = item.commissions
+        fbo_min = commissions.fbo_direct_flow_trans_min_amount if commissions else None
+        fbo_max = commissions.fbo_direct_flow_trans_max_amount if commissions else None
+        fbs_min = commissions.fbs_first_mile_min_amount if commissions else None
+        fbs_max = commissions.fbs_first_mile_max_amount if commissions else None
+        return {
+            "product_id": item.product_id,
+            "offer_id": item.offer_id,
+            "price": float(item.price.price) if item.price and item.price.price else None,
+            "commission_fbo_percent": commissions.sales_percent_fbo if commissions else None,
+            "commission_fbs_percent": commissions.sales_percent_fbs if commissions else None,
+            "acquiring_percent": item.acquiring,
+            "logistics_fbo_mid": (fbo_min + fbo_max) / 2 if fbo_min is not None and fbo_max is not None else None,
+            "logistics_fbs_first_mile_mid": (fbs_min + fbs_max) / 2 if fbs_min is not None and fbs_max is not None else None,
+            "volume_weight_l": item.volume_weight,
+        }
 
     async def get_warehouse_list(self) -> WarehouseListResponse:
         payload = {}

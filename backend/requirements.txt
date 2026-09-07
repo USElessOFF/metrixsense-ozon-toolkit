@@ -3,7 +3,7 @@
 fastapi>=0.141.1
 uvicorn>=0.52.4
 pydantic>=2.13.5
-pydantic-settings>=2.0.0
+pydantic-settings>=2.15.0
 pydantic[email]>=2.0.0
 
 # HTTP
@@ -12,18 +12,18 @@ httpx>=0.28.1
 # Database
 sqlalchemy>=2.0.0
 aiosqlite>=0.22.1
-alembic>=1.12.0
+alembic>=1.19.1
 
 # Auth
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
-bcrypt>=4.0.0
+bcrypt>=5.0.0
 
 # .env
 python-dotenv>=1.2.3
 
 # Utils
-cryptography>=42.0.0
+cryptography>=50.0.1
 structlog>=26.1.0
 tenacity>=9.1.4
 pytz>=2023.3
@@ -37,5 +37,5 @@ xlsxwriter>=3.2.9
 # Testing
 apscheduler>=3.10.0
 pytest>=9.1.1
-pytest-asyncio>=0.21.0
+pytest-asyncio>=1.4.0
 httpx>=0.28.1

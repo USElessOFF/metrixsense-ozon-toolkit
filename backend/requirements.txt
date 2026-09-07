@@ -37,5 +37,5 @@ xlsxwriter>=3.2.9
 # Testing
 apscheduler>=3.10.0
 pytest>=9.1.1
-pytest-asyncio>=0.21.0
+pytest-asyncio>=1.4.0
 httpx>=0.28.1

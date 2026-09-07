@@ -4,30 +4,52 @@
 
 **Бесплатная аналитика для продавцов Ozon — локально, из коробки, без подписок**
 
+[![Release](https://img.shields.io/github/v/release/USElessOFF/metrixsense-ozon-toolkit?display_name=tag)](https://github.com/USElessOFF/metrixsense-ozon-toolkit/releases)
 [![CI](https://github.com/USElessOFF/metrixsense-ozon-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/USElessOFF/metrixsense-ozon-toolkit/actions/workflows/ci.yml)
-[![Release](https://github.com/USElessOFF/metrixsense-ozon-toolkit/actions/workflows/release.yml/badge.svg)](https://github.com/USElessOFF/metrixsense-ozon-toolkit/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](backend/requirements.txt)
-[![Docker Compose](https://img.shields.io/badge/docker-compose-2496ED.svg)](docker-compose.yml)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](ruff.toml)
+[![Self-hosted](https://img.shields.io/badge/self--hosted-данные_на_вашем_ПК-0891b2)](#-безопасность-и-приватность)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#-участие-в-проекте)
 
-Открытая альтернатива платным сервисам: полные метрики магазина
-Ozon и поддержка аналитических решений — **на вашем компьютере**. Данные не
-покидают вашу машину: SQLite, локальный запуск, никаких облаков.
+Открытая альтернатива платным сервисам: метрики магазина Ozon, юнит-экономика
+и планирование поставок — **на вашем компьютере**. Данные не покидают вашу
+машину: SQLite, локальный запуск, никаких облаков и подписок.
+
+<img src="docs/screenshots/login.png" alt="MetrixSense — экран входа" width="820" />
+
+<a href="https://github.com/USElessOFF/metrixsense-ozon-toolkit/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=USElessOFF/metrixsense-ozon-toolkit" alt="Контрибьюторы" />
+</a>
 
 </div>
 
 ---
 
+## 💡 Почему MetrixSense
+
+- **Бесплатно навсегда.** Подписки аналитических сервисов стоят от нескольких тысяч
+  рублей в месяц. Здесь — ничего платить не нужно, код открыт под MIT.
+- **Данные остаются у вас.** API-ключи и история продаж хранятся в локальной SQLite.
+  Ни телеметрии, ни облаков — можно отключить интернет после настройки.
+- **Из коробки.** Один скрипт установки — и веб-интерфейс работает на вашей машине.
+  Node.js и прочие инструменты разработки не нужны: сборка интерфейса уже в репозитории.
+- **Прозрачность.** Весь код на виду: можно проверить, куда уходят ваши ключи
+  (в никуда), и как считается маржа.
+
 ## ✨ Возможности
 
-- 📦 **Секции аналитики** — цены и комиссии, карточки товаров (габариты, объёмный вес),
-  финансовые начисления, рейтинг продавца — каждый блок доступен отдельно, без ожидания полного отчёта
-- 📈 **Полный отчёт в фоне** — собирается асинхронно, статус и скачивание в любой момент
-- 💰 **Юнит-экономика** — налоговые режимы (УСН 6%, УСН «доходы − расходы» и др.),
-  логистика, рекламный бюджет, доля себестоимости
-- 📤 **Экспорт** — Excel и CSV по каждому отчёту
+- 🎯 **Дашборд «что делать»** — приоритетные действия по магазину: докупить товар,
+  распродать мёртвый сток, пересмотреть дорогие расходы
+- 📦 **Секции аналитики** — цены и комиссии, карточки товаров, финансовые начисления,
+  рейтинг продавца, ДДС-журнал, поисковые фразы — каждый блок открывается отдельно
+- 📈 **Планирование поставок** — дни запаса, IDC Ozon, разбивка по складам,
+  рекомендуемая поставка
+- 💰 **Юнит-экономика** — калькулятор маржи с налогами (УСН 6%, УСН «доходы − расходы»),
+  логистикой и рекламным бюджетом; для новинок и товаров из вашего каталога
+- 🔎 **Поиск аналогов** — похожие товары каталога по TF-IDF близости названий
+- 📤 **Экспорт** — CSV из любой таблицы (открывается в Excel) + Excel-файл полного отчёта
 - 🧩 **Расширение для Chrome** — аналитика прямо на страницах Ozon
-- 🔐 **Локальность** — ваши API-ключи и данные продаж хранятся только у вас (SQLite + Alembic)
 
 ## 🚀 Быстрый старт
 
@@ -46,8 +68,7 @@ irm https://raw.githubusercontent.com/USElessOFF/metrixsense-ozon-toolkit/main/i
 
 ### Windows — без Docker и WSL2 (нативно)
 
-Один процесс Python, ничего лишнего — подходит, если не хочется ставить WSL2
-или Docker Desktop лицензионно недоступен:
+Один процесс Python, ничего лишнего:
 
 ```powershell
 irm https://raw.githubusercontent.com/USElessOFF/metrixsense-ozon-toolkit/main/install_windows.ps1 | iex
@@ -63,7 +84,7 @@ curl -fsSL https://raw.githubusercontent.com/USElessOFF/metrixsense-ozon-toolkit
 
 ```bash
 git clone https://github.com/USElessOFF/metrixsense-ozon-toolkit.git
-cd metrixsense
+cd metrixsense-ozon-toolkit
 
 python -m venv .venv
 # Windows:  .venv\Scripts\pip install -r backend\requirements.txt
@@ -82,30 +103,23 @@ uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
 |---|---|
 | `http://localhost:8080` (Docker) или `http://127.0.0.1:8000` (нативно) | Веб-интерфейс |
 | `/docs` | Интерактивная API-документация (Swagger UI) |
-| `/redoc` | API-документация (ReDoc) |
 | `/health` | Проверка работоспособности |
 
 ## 🧭 Первые шаги
 
 1. Откройте веб-интерфейс и войдите: **metrixsense / metrixsense**
    *(смените пароль — задайте `DEFAULT_PASSWORD` в `backend/.env`)*
-2. Онбординг: введите **Ozon Seller API** ключи ([где взять](https://seller.ozon.ru/app/settings/api-keys)) — обязательны
-3. Опционально: **Performance API** ключи ([где взять](https://performance.ozon.ru/app/settings/api-keys)) — для рекламных данных
-4. Сверьте настройки юнит-экономики: налоговый режим, логистика, себестоимость
-5. Соберите первый отчёт 🎉
+2. Пройдите настройку магазина: вставьте ключи **Seller API**
+   (Client ID + API key из личного кабинета Ozon) и нажмите «Проверить подключение».
+   Performance API — опционально, для рекламных данных.
+3. Сверьте параметры юнит-экономики: налоговая система, логистика,
+   доля себестоимости, схема работы (FBO/FBS).
+4. Готово — дашборд покажет, что требует внимания, а разделы в сайдбаре
+   открываются независимо друг от друга.
 
-## ⚠️ Возможные проблемы при установке
-
-| Проблема | Решение |
-|---|---|
-| PowerShell: «выполнение сценариев отключено» | Возникает при запуске сохранённого `.ps1` двойным кликом. One-liner `irm \| iex` работает и без этого. Либо выполните: `Set-ExecutionPolicy -Scope Process Bypass` |
-| Установка «зависла» на WSL2 | Нужна перезагрузка. Скрипт планирует автопродолжение (RunOnce) — просто перезагрузитесь и подтвердите UAC |
-| «Виртуализация отключена» | Включите VT-x/AMD-V в BIOS/UEFI (Intel VT-x / AMD SVM), затем перезапустите установщик |
-| `winget` не найден (старые/LTSC-сборки) | Установщики сами скачают Python / Docker с официальных сайтов напрямую |
-| Порт 8000/8080 занят | Освободите порт или смените `PORT` в `backend/.env` / секцию `ports` в `docker-compose.yml` |
-| SmartScreen / антивирус предупреждает | «Выполнить в любом случае». Скрипты скачивают только с github.com, python.org, docker.com |
-| Лицензия Docker Desktop | Бесплатно для физлиц и бизнеса < 250 сотрудников и < $10M выручки. Иначе — используйте нативный установщик |
-| Docker: permission denied (Linux) | Перелогиньтесь после установки (группа docker) или используйте sudo |
+Полный отчёт собирается в фоне: запустите на странице «Полный отчёт»
+и возвращайтесь, когда статус станет «готов» — Excel-файл появится
+в `backend/files/`.
 
 ## 🧩 Расширение для Chrome
 
@@ -114,63 +128,59 @@ uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
 3. «Загрузить распакованное расширение» → папка `extension-metrixsense`
 4. Убедитесь, что MetrixSense запущен — расширение работает с локальным бэкендом
 
-## 🏗 Архитектура
+## 🆘 Неполадки
 
-```
-┌──────────────┐  /api /auth /health   ┌──────────────────────────────┐
-│   Browser /  │ ─────────────────────▶│  nginx (Docker) или FastAPI  │
-│  Extension   │                       └───────────────┬──────────────┘
-└──────────────┘                                       ▼
-                                         ┌──────────────────────────────┐
-                                         │  FastAPI (backend/app)       │
-                                         │  routers → services →        │
-                                         │  adapters → models           │
-                                         └───────┬─────────────┬────────┘
-                                                 ▼             ▼
-                                         ┌────────────┐  ┌──────────────────┐
-                                         │ SQLite WAL │  │ Ozon Seller API  │
-                                         │ (alembic)  │  │ Ozon Perf. API   │
-                                         └────────────┘  └──────────────────┘
-```
-
-| Компонент | Технологии |
+| Проблема | Решение |
 |---|---|
-| Backend | Python 3.12+, FastAPI, SQLAlchemy 2 (async), Alembic, httpx, structlog, pandas |
-| База данных | SQLite (WAL) — нулевая настройка; схема через Alembic-миграции |
-| Frontend | Статика в `web/` |
-| Расширение | Chrome MV3 (`extension-metrixsense`) |
-| CI/CD | GitHub Actions: тесты (py3.12/3.13) + ruff + docker build; релизы — ghcr.io |
+| Не входит с `metrixsense / metrixsense` | Учётная запись создаётся при первом запуске; проверьте `DEFAULT_USERNAME` / `DEFAULT_PASSWORD` в `backend/.env` |
+| Порт 8000/8080 занят | Освободите порт или смените `PORT` в `backend/.env` / секцию `ports` в `docker-compose.yml` |
+| SmartScreen / антивирус предупреждает | «Выполнить в любом случае». Скрипты скачивают только с github.com, python.org, docker.com |
+| Лицензия Docker Desktop | Бесплатно для физлиц и бизнеса < 250 сотрудников и < $10M выручки. Иначе — нативный установщик |
+| Docker: permission denied (Linux) | Перелогиньтесь после установки (группа docker) или используйте sudo |
 
-Слои backend: `app/routers` (HTTP) → `app/services/report_service` (сборка отчётов)
-→ `app/ozon_seller`, `app/ozon_performance` (клиенты Ozon API) → `app/adapters`
-(доступ к данным) → `app/models` (SQLAlchemy). Фоновые задачи — `app/get_bg_tasks`,
-кэш аналитики — `models/analytics_cache`.
+## 🔐 Безопасность и приватность
 
-## 🗺 Roadmap
-
-- [x] Backend: отчёты, секции, юнит-экономика, миграции Alembic
-- [x] Установка «из коробки»: Windows (Docker / нативно) и Linux
-- [x] Расширение для Chrome (MVP)
-- [ ] Эндпоинт аналитики товара `/api/analytics/product` для виджета расширения
-- [ ] Веб-интерфейс
-- [ ] Графики динамики, DRR, ABC-анализ
-- [ ] Профиль PostgreSQL для серверной установки
-- [ ] i18n веб-интерфейса (ru/en)
+- API-ключи Ozon **шифруются** перед записью на диск (ключ шифрования генерируется
+  локально при первом запуске) и **маскируются** в ответах API.
+- Все данные — продажи, расчёты, ключи — лежат в локальной SQLite
+  (`backend/data/`) и никуда не отправляются.
+- Сервер по умолчанию слушает только `127.0.0.1` — доступ есть только у вас.
+- Аудит приветствуется: весь код открыт, зависимостей минимум.
 
 ## 🛠 Разработка
 
-```bash
-python -m venv .venv
-# Windows: .venv\Scripts\activate
-source .venv/bin/activate
-pip install -r backend/requirements.txt
+Backend (Python 3.12+):
 
+```bash
+pip install -r backend/requirements.txt
 python -m pytest backend/tests -m "not live" -q   # тесты (live-тесты: pytest -m live)
 ruff check backend                                 # линтер
 uvicorn backend.app.main:app --reload              # dev-сервер
 ```
 
-Утилита чистки логов: `python backend/scripts/format_log.py --latest`.
+Frontend (Node.js 20.19+, только для изменений интерфейса —
+пользователям сборка не нужна):
+
+```bash
+cd web
+npm ci
+npm run dev        # dev-сервер с прокси на localhost:8000
+npm run check      # tsc + eslint
+npm run build      # сборка в web/dist — коммитится в репозиторий
+```
+
+Подробности устройства — в [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## 🤝 Участие в проекте
+
+PR-ы приветствуются: исправления, новые секции аналитики, i18n.
+Идеи и планы живут в [Issues](https://github.com/USElessOFF/metrixsense-ozon-toolkit/issues) —
+загляните туда перед крупными изменениями.
+
+<!--
+Аналитика репозитория (Repobeats): подключается за минуту на
+https://repobeats.com — вставьте выданный <img> сюда.
+-->
 
 ## 📄 Лицензия и дисклеймер
 

@@ -1,0 +1,3 @@
+# Собранная стата фронтенда — как есть, без EOL-конвертаций
+web/dist/** -text
+docs/screenshots/*.png binary

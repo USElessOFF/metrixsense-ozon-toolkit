@@ -27,6 +27,9 @@ logger = structlog.get_logger(__name__)
 
 
 _WEB_DIR = PROJECT_ROOT.parent / "web"
+# собранный SPA коммитится в web/dist; без него остаётся заглушка web/index.html
+if (_WEB_DIR / "dist" / "index.html").is_file():
+    _WEB_DIR = _WEB_DIR / "dist"
 
 
 def create_app() -> FastAPI:

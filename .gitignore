@@ -2,7 +2,6 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
-dist/
 build/
 *.egg
 .venv/
@@ -50,7 +49,6 @@ backend/*.db
 
 # Node / frontend
 node_modules/
-web/dist/
 
 # Docker
 docker-compose.override.yml

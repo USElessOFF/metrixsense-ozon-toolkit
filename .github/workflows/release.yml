@@ -54,7 +54,7 @@ jobs:
         run: |
           zip -r "metrixsense-${{ github.ref_name }}.zip" . \
             -x ".git/*" ".venv/*" "backend/data/*" "backend/files/*" "backend/logs/*" \
-               "backend/.env" ".pytest_cache/*" "backend/.pytest_cache/*" "web/dist/*"
+               "backend/.env" ".pytest_cache/*" "backend/.pytest_cache/*"
 
       - name: Publish release
         uses: softprops/action-gh-release@v3

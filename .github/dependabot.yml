@@ -20,8 +20,8 @@ updates:
       actions-all:
         patterns: ["*"]
 
-  # Uncomment when the web frontend (package.json) is added:
-  # - package-ecosystem: npm
-  #   directory: "/web"
-  #   schedule:
-  #     interval: weekly
+  # Frontend (Vite + React в web/)
+  - package-ecosystem: npm
+    directory: "/web"
+    schedule:
+      interval: weekly

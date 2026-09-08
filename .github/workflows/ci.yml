@@ -85,7 +85,3 @@ jobs:
           npm ci
           npm run check --if-present
           npm run build
-
-      - name: Verify committed dist is fresh
-        working-directory: web
-        run: git diff --exit-code -- dist

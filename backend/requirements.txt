@@ -30,7 +30,7 @@ pytz>=2023.3
 aiofiles>=25.1.0
 
 # Reports
-pandas>=2.0.0
+pandas>=3.0.5
 numpy>=2.5.2
 xlsxwriter>=3.2.9
 

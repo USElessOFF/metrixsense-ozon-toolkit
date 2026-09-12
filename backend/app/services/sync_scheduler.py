@@ -127,6 +127,6 @@ async def _run_all_sections() -> None:
 async def shutdown_scheduler() -> None:
     global _sync_scheduler
     if _sync_scheduler and _sync_scheduler.running:
-        _sync_scheduler.shutdown(wait=True, timeout=30)
+        _sync_scheduler.shutdown(wait=True)
         logger.info("sync scheduler stopped")
     _sync_scheduler = None

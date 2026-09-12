@@ -28,6 +28,8 @@ class ReportStatusResponse(BaseModel):
     info: str | None = Field(default=None, description="Additional info or error message")
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    date_from: datetime | None = Field(default=None, description="Period start of the report request")
+    date_to: datetime | None = Field(default=None, description="Period end of the report request")
 
 
 class ProductCardsRequest(BaseModel):

@@ -107,10 +107,10 @@ class AnalogFinderService:
         top_n: int = 10,
         min_similarity: float = 0.1,
     ) -> AnalogsResponse:
-        catalog = await seller.get_product_info_list()
+        catalog_items = await seller.get_all_product_info_items()
         products = [
             {"sku": item.sku, "name": item.name or "", "offer_id": item.offer_id, "product_id": item.product_id}
-            for item in catalog.items
+            for item in catalog_items
             if item.sku is not None and item.name
         ]
         logger.info("::analog_finder catalog", size=len(products), target_sku=sku)

@@ -209,6 +209,20 @@ def get_reports_router() -> APIRouter:
 
     # /requests/ — от коллизий с /sections/*
     @router.get(
+        "/requests/latest",
+        response_model=ReportStatusResponse,
+    )
+    async def get_latest_report_status(
+        db: MetrixAdapter = Depends(get_metrix_adapter_for_user),  # noqa: B008
+    ) -> ReportStatusResponse:
+        """Последний отчётный запрос пользователя — UI восстанавливает статус после перезагрузки"""
+        service = ReportService(db)
+        report = await service.get_latest_report()
+        if report is None:
+            raise HTTPException(status_code=404, detail="No report requests yet")
+        return ReportStatusResponse.model_validate(report, from_attributes=True)
+
+    @router.get(
         "/requests/{request_id}",
         response_model=ReportStatusResponse,
     )

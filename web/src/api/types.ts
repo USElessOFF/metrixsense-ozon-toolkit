@@ -220,6 +220,8 @@ export interface ReportStatus {
   info: string | null
   created_at: string | null
   updated_at: string | null
+  date_from: string | null
+  date_to: string | null
 }
 
 export interface OnboardingStatus {

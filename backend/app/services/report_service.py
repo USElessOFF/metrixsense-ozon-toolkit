@@ -99,6 +99,19 @@ FINANCE_MAX_PAGES = 100
 # Порог крупногабарита Ozon: сторона упаковки больше 500 мм → иная тарифная зона
 OVERSIZE_SIDE_MM = 500
 
+# Ozon закрыл детальную финансовую выписку v3 (400, code 9 «obsolete method
+# cannot be used») — секции «Начисления» и «ДДС» дают человеку понятную ошибку
+# вместо голого Client error 400. Замена появится после обновления API.
+_FINANCE_OBSOLETE_MARKER = "obsolete method cannot be used"
+_FINANCE_UNAVAILABLE_MESSAGE = (
+    "Финансовая выписка недоступна: Ozon закрыл метод /v3/finance/transaction (obsolete). "
+    "Секции «Начисления» и «ДДС» временно не работают — ожидайте обновление интеграции."
+)
+
+
+def _finance_method_closed(e: Exception) -> bool:
+    return _FINANCE_OBSOLETE_MARKER in str(e)
+
 
 class ReportService:
     """Сервис создания и компиляции аналитических отчётов Ozon"""
@@ -160,6 +173,9 @@ class ReportService:
 
     async def get_report(self, request_uuid: str) -> ReportRequestOzon | None:
         return await self.adapter.get_report_request(request_uuid)
+
+    async def get_latest_report(self) -> ReportRequestOzon | None:
+        return await self.adapter.get_latest_report_request()
 
     # Секции для REST API: DI-клиент на запрос, кэш AnalyticsCache
     # Read-through с TTL - правки цен подтягиваются не позже TTL
@@ -425,8 +441,8 @@ class ReportService:
         if cached is not None:
             return cached
 
-        cards = await seller.get_product_info_list(ProductInfoListRequest(limit=1000))
-        skus = [str(item.sku) for item in cards.items if item.sku]
+        cards_items = await seller.get_all_product_info_items()
+        skus = [str(item.sku) for item in cards_items if item.sku]
         if not skus:
             empty = StockPlanningSectionResponse(
                 section="stock_planning",
@@ -540,8 +556,8 @@ class ReportService:
         if cached is not None:
             return cached
 
-        cards = await seller.get_product_info_list(ProductInfoListRequest(limit=1000))
-        skus = [str(item.sku) for item in cards.items if item.sku]
+        cards_items = await seller.get_all_product_info_items()
+        skus = [str(item.sku) for item in cards_items if item.sku]
         if not skus:
             empty = SearchQueriesSectionResponse(
                 section="search_queries", generated_at=generated_at, row_count=0,
@@ -606,19 +622,24 @@ class ReportService:
         operations = []
         page = 1
         while True:
-            resp = await seller.get_finance_transaction_list(
-                FinanceTransactionListRequest(
-                    filter_=FinanceTransactionListFilter(
-                        date=FinanceTransactionDateFilter(
-                            from_=datetime.strptime(date_from, DATE_FORMAT).replace(tzinfo=timezone.utc),
-                            to=datetime.strptime(date_to, DATE_FORMAT).replace(tzinfo=timezone.utc),
+            try:
+                resp = await seller.get_finance_transaction_list(
+                    FinanceTransactionListRequest(
+                        filter_=FinanceTransactionListFilter(
+                            date=FinanceTransactionDateFilter(
+                                from_=datetime.strptime(date_from, DATE_FORMAT).replace(tzinfo=timezone.utc),
+                                to=datetime.strptime(date_to, DATE_FORMAT).replace(tzinfo=timezone.utc),
+                            ),
+                            transaction_type=TransactionType.ALL,
                         ),
-                        transaction_type=TransactionType.ALL,
-                    ),
-                    page=page,
-                    page_size=1000,
+                        page=page,
+                        page_size=1000,
+                    )
                 )
-            )
+            except Exception as e:
+                if _finance_method_closed(e):
+                    raise OzonAPIError(_FINANCE_UNAVAILABLE_MESSAGE) from e
+                raise
             operations.extend(resp.operations)
             logger.info(
                 "::cashflow fetch page",
@@ -1171,6 +1192,8 @@ class ReportService:
             return df, totals
         except Exception as e:
             logger.exception("::_collect_finance_operations_data> Failed", error=str(e))
+            if _finance_method_closed(e):
+                raise OzonAPIError(_FINANCE_UNAVAILABLE_MESSAGE) from e
             if strict:
                 raise OzonAPIError(f"Не удалось получить финансовую выписку: {e}") from e
             return empty

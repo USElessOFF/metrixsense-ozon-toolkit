@@ -48,9 +48,7 @@ export default function FullReport() {
     api
       .get<ReportStatus>('/api/reports/requests/latest')
       .then(latest => {
-        if (latest.status === 'pending' || latest.status === 'in_progress') {
-          setReport(latest)
-        }
+        setReport(latest)
       })
       .catch(() => {
         // 404 — отчётов ещё не было, ничего не подставляем

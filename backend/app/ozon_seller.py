@@ -338,7 +338,7 @@ class OzonSellerClient:
         return ProductInfoListResponse.model_validate(resp_json)
 
     async def get_all_product_info_items(
-        self, *, catalog_page_size: int = 1000, info_batch_size: int = 1000
+        self, *, catalog_page_size: int = 100, info_batch_size: int = 1000
     ) -> list[ProductInfoItem]:
         """Полный каталог карточек продавца.
 
@@ -346,6 +346,8 @@ class OzonSellerClient:
         (400 «use either offer_id or product_id or sku»), поэтому сначала
         собираем SKU постранично через /v3/product/list, затем берём карточки
         (имя, комиссии, объёмный вес) батчами по SKU из info/list.
+        Важно: product/list при limit=1000 возвращает пустой result —
+        страничный размер каталога не должен превышать 100.
         """
         skus: list[str] = []
         last_id = ""

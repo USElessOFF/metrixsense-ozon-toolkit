@@ -163,7 +163,7 @@ export default function Settings() {
               className="input"
               value={secretsForm.seller_client_id}
               onChange={e => setSecretsForm(f => ({ ...f, seller_client_id: e.target.value }))}
-              placeholder={secrets?.seller_client_id ?? 'обязателен для отчётов'}
+              placeholder="положительное целое число из кабинета Ozon"
             />
           </Field>
           <Field label="Seller API Key">
@@ -172,7 +172,7 @@ export default function Settings() {
               type="password"
               value={secretsForm.seller_api_key}
               onChange={e => setSecretsForm(f => ({ ...f, seller_api_key: e.target.value }))}
-              placeholder={secrets?.seller_api_key ?? '••••'}
+              placeholder="Api-Key из кабинета Ozon"
             />
           </Field>
           <Field label="Performance Client ID" hint="опционально — рекламный кабинет">
@@ -180,7 +180,7 @@ export default function Settings() {
               className="input"
               value={secretsForm.performance_client_id}
               onChange={e => setSecretsForm(f => ({ ...f, performance_client_id: e.target.value }))}
-              placeholder={secrets?.performance_client_id ?? 'опционально'}
+              placeholder="опционально"
             />
           </Field>
           <Field label="Performance Client Secret">
@@ -189,7 +189,7 @@ export default function Settings() {
               type="password"
               value={secretsForm.performance_secret}
               onChange={e => setSecretsForm(f => ({ ...f, performance_secret: e.target.value }))}
-              placeholder={secrets?.performance_secret ?? 'опционально'}
+              placeholder="опционально"
             />
           </Field>
           <div className="form-actions">

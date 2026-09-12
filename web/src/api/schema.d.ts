@@ -406,6 +406,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reports/requests/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Latest Report Status
+         * @description Последний отчётный запрос пользователя — UI восстанавливает статус после перезагрузки
+         */
+        get: operations["get_latest_report_status_api_reports_requests_latest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reports/requests/{request_id}": {
         parameters: {
             query?: never;
@@ -1215,6 +1235,16 @@ export interface components {
             created_at?: string | null;
             /** Updated At */
             updated_at?: string | null;
+            /**
+             * Date From
+             * @description Period start of the report request
+             */
+            date_from?: string | null;
+            /**
+             * Date To
+             * @description Period end of the report request
+             */
+            date_to?: string | null;
         };
         /**
          * SearchQueriesSectionResponse
@@ -2504,6 +2534,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_latest_report_status_api_reports_requests_latest_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportStatusResponse"];
                 };
             };
         };

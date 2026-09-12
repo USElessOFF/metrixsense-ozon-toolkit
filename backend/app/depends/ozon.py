@@ -29,6 +29,11 @@ async def get_ozon_seller_client(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Seller API secrets are required. Configure them first (/api/secrets).",
         )
+    if not secrets.seller_client_id.strip().isdigit():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Client-Id должен быть положительным целым числом (см. кабинет Ozon). Текущее значение некорректно.",
+        )
     client = OzonSellerClient(
         client_id=secrets.seller_client_id,
         api_key=secrets.seller_api_key,

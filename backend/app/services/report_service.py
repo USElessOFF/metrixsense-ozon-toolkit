@@ -739,23 +739,23 @@ class ReportService:
         if date_to > datetime.now(tz=timezone.utc):
             raise OzonAPIError("Date range cannot be in the future")
 
-    async def _compile_report_full_report(self, request_uuid: str, secrets: OzonSecrets, has_premium: bool) -> None:
+    async def _compile_report_full_report(self, request_uuid: str, secrets, has_premium: bool) -> None:
         async with await get_async_context_session() as session:
-            adapter = MetrixAdapter(session, secrets.user_id)
-            request = await adapter.get_report_request(request_uuid)
-            if request is None:
-                logger.error("::_compile_report> Report request not found", request_uuid=request_uuid)
-                raise ValueError("Unable get your request from database")
-
-            # Настройки резолвим до клиентов: SettingsError без висящих соединений
-            tax_system, logistics_cost, cost_price_share, fbo = await self._resolve_unit_economics_settings(adapter)
-
-            seller = OzonSellerClient(
-                client_id=secrets.seller_client_id or "",
-                api_key=secrets.seller_api_key or "",
-            )
-            performance: OzonPerformanceClient | None = None
+            adapter = MetrixAdapter(session, self.adapter.user_id)
             try:
+                request = await adapter.get_report_request(request_uuid)
+                if request is None:
+                    logger.error("::_compile_report> Report request not found", request_uuid=request_uuid)
+                    raise ValueError("Unable get your request from database")
+
+                # Настройки резолвим до клиентов: SettingsError без висящих соединений
+                tax_system, logistics_cost, cost_price_share, fbo = await self._resolve_unit_economics_settings(adapter)
+
+                seller = OzonSellerClient(
+                    client_id=secrets.seller_client_id or "",
+                    api_key=secrets.seller_api_key or "",
+                )
+                performance: OzonPerformanceClient | None = None
                 if has_premium:
                     performance = OzonPerformanceClient(
                         client_id=secrets.performance_client_id or "",

@@ -1648,7 +1648,8 @@ class ReportService:
                     worksheet.write(0, col_num, value, header_fmt)
 
                 for idx, col in enumerate(df_sorted.columns):
-                    max_len = max(df_sorted[col].astype(str).map(len).max(), len(col)) + 2
+                    col_values = df_sorted[col].fillna("").astype(str).map(len)
+                    max_len = max(col_values.max(), len(col)) + 2
                     worksheet.set_column(idx, idx, max_len)
 
                 worksheet.set_row(0, 60)

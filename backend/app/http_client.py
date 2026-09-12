@@ -14,7 +14,18 @@ from backend.app.exceptions import CircuitOpenError
 
 
 def _is_rate_limited(exc: BaseException) -> bool:
-    return isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429
+    if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429:
+        return True
+    # Ozon отдаёт rate-limit как код в теле (code 8, «per second»),
+    # а не как HTTP 429 — ловим по телу ответа.
+    if isinstance(exc, httpx.HTTPStatusError):
+        try:
+            body = exc.response.json()
+            if isinstance(body, dict) and body.get("code") == 8:
+                return True
+        except Exception:
+            pass
+    return False
 
 
 def _is_server_error(exc: BaseException) -> bool:

@@ -42,13 +42,36 @@ export default function FullReport() {
     return () => window.clearInterval(timer.current)
   }, [report])
 
+  // После перезагрузки страницы восстанавливаем статус последнего запроса:
+  // отчёт собирается в фоне — UI не должен терять его из вида
+  useEffect(() => {
+    api
+      .get<ReportStatus>('/api/reports/requests/latest')
+      .then(latest => {
+        if (latest.status === 'pending' || latest.status === 'in_progress') {
+          setReport(latest)
+        }
+      })
+      .catch(() => {
+        // 404 — отчётов ещё не было, ничего не подставляем
+      })
+  }, [])
+
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setBusy(true)
     setError(null)
     try {
       const created = await api.post<{ request_uuid: string; status: string }>('/api/reports/full', range)
-      setReport({ request_uuid: created.request_uuid, status: created.status, info: null, created_at: null, updated_at: null })
+      setReport({
+        request_uuid: created.request_uuid,
+        status: created.status,
+        info: null,
+        created_at: null,
+        updated_at: null,
+        date_from: range.date_from,
+        date_to: range.date_to,
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось создать отчёт')
     } finally {

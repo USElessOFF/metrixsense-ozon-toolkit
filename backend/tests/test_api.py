@@ -205,7 +205,7 @@ class TestSecrets:
     async def test_upsert_secrets(self, client: AsyncClient, auth_headers: dict[str, Any]):
         """POST /api/secrets stores secrets successfully"""
         secrets = {
-            "seller_client_id": "test_seller_id",
+            "seller_client_id": "1234567890",
             "seller_api_key": "test_seller_key",
         }
         resp = await client.post(
@@ -219,7 +219,7 @@ class TestSecrets:
         resp = await client.get(self.SECRETS_URL, headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()
-        assert data.get("seller_client_id") == "te********r_id"
+        assert data.get("seller_client_id") == "12********7890"
         assert data.get("seller_api_key") == "te********_key"
 
     @pytest.mark.asyncio
@@ -229,7 +229,7 @@ class TestSecrets:
         await client.post(
             self.SECRETS_URL,
             headers=auth_headers,
-            json={"seller_client_id": "user1_secret"},
+            json={"seller_client_id": "987654321"},
         )
 
         # Create second user and login

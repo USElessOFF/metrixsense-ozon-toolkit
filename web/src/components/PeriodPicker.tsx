@@ -20,7 +20,7 @@ export function PeriodPicker({ from, to, onChange }: Props) {
   return (
     <div className="period">
       {QUICK.map(d => (
-        <button key={d} className="btn ghost tiny" onClick={() => quick(d)}>
+        <button key={d} type="button" className="btn ghost tiny" onClick={() => quick(d)}>
           {d} дн
         </button>
       ))}

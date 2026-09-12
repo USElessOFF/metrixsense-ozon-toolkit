@@ -44,6 +44,7 @@ from backend.app.pydantic_models.ozon.seller.response import (
     ManageStocksResponse,
     PostingFbsListResponse,
     PostingFbsUnfulfilledListResponse,
+    ProductInfoItem,
     ProductInfoListResponse,
     ProductInfoPricesItemV5,
     ProductInfoPricesV5Response,
@@ -335,6 +336,37 @@ class OzonSellerClient:
             response=resp_json,
         )
         return ProductInfoListResponse.model_validate(resp_json)
+
+    async def get_all_product_info_items(
+        self, *, catalog_page_size: int = 1000, info_batch_size: int = 1000
+    ) -> list[ProductInfoItem]:
+        """Полный каталог карточек продавца.
+
+        /v3/product/info/list с пустым фильтром Ozon отклоняет
+        (400 «use either offer_id or product_id or sku»), поэтому сначала
+        собираем SKU постранично через /v3/product/list, затем берём карточки
+        (имя, комиссии, объёмный вес) батчами по SKU из info/list.
+        """
+        skus: list[str] = []
+        last_id = ""
+        while True:
+            resp = await self.get_product_list(
+                ProductListRequest(last_id=last_id, limit=catalog_page_size)
+            )
+            page = [item for item in resp.items if item.sku is not None]
+            if not page:
+                break
+            skus.extend(str(item.sku) for item in page)
+            last_id = resp.last_id or ""
+            if len(page) < catalog_page_size or not last_id:
+                break
+
+        items: list[ProductInfoItem] = []
+        for start in range(0, len(skus), info_batch_size):
+            batch = skus[start:start + info_batch_size]
+            info = await self.get_product_info_list(ProductInfoListRequest(sku=batch))
+            items.extend(info.items)
+        return items
 
     async def get_product_info_prices(
         self, request: ProductInfoPricesV5Request

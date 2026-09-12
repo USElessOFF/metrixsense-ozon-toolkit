@@ -1,4 +1,5 @@
 
+import structlog
 from fastapi import APIRouter, Depends
 
 from backend.app.adapters.metrix_adapter import MetrixAdapter
@@ -11,6 +12,7 @@ from backend.app.security import decrypt, mask
 
 def get_secrets_router() -> APIRouter:
     router = APIRouter(prefix="/api", tags=["secrets"])
+    logger = structlog.get_logger(__name__)
 
     @router.get("/secrets", response_model=SecretsResponse)
     async def get_secrets(db: MetrixAdapter = Depends(get_metrix_adapter_for_user)):  # noqa: B008
@@ -70,13 +72,23 @@ def get_secrets_router() -> APIRouter:
 
         if data.seller_client_id and data.seller_api_key:
             seller = OzonSellerClient(data.seller_client_id, data.seller_api_key)
-            seller_valid = await seller.check_connection()
-            await seller.close()
+            try:
+                seller_valid = await seller.check_connection()
+            except Exception as e:  # noqa: BLE001 — невалидные ключи не должны ронять ручку (500)
+                logger.warning("Seller keys check failed", error=str(e))
+                seller_valid = False
+            finally:
+                await seller.close()
 
         if data.performance_client_id and data.performance_secret:
             perf = OzonPerformanceClient(data.performance_client_id, data.performance_secret)
-            performance_valid = await perf.check_connection()
-            await perf.close()
+            try:
+                performance_valid = await perf.check_connection()
+            except Exception as e:  # noqa: BLE001
+                logger.warning("Performance keys check failed", error=str(e))
+                performance_valid = False
+            finally:
+                await perf.close()
 
         return SecretsResponse(
             seller_client_id=secrets.seller_client_id,

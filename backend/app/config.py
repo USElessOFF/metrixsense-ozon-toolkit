@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     OZON_PERFORMANCE_SECRET: str = ""
 
     LOG_LEVEL: str = "INFO"
+    LOG_SQL: bool = False
     LOG_DIR: str = str(PROJECT_ROOT / "logs")
     ENVIRONMENT: str = "development"
 

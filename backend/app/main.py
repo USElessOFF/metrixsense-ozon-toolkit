@@ -2,6 +2,17 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path as _Path
+
+
+_PROJECT_DIR = _Path(__file__).resolve().parents[2]
+if str(_PROJECT_DIR) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_DIR))
+
+import os
+from datetime import datetime
+
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,13 +32,16 @@ from backend.app.routers import (
     get_settings_router,
 )
 
+os.environ.setdefault(
+    "METRIXSENSE_LOG_FILE",
+    f"app_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+)
 setup_logging(settings)
 
 logger = structlog.get_logger(__name__)
 
 
 _WEB_DIR = PROJECT_ROOT.parent / "web"
-# собранный SPA коммитится в web/dist; без него остаётся заглушка web/index.html
 if (_WEB_DIR / "dist" / "index.html").is_file():
     _WEB_DIR = _WEB_DIR / "dist"
 
@@ -70,9 +84,9 @@ app = create_app()
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
-        "app.main:app",
+        "backend.app.main:app",
         host=settings.HOST,
         port=settings.PORT,
         reload=settings.DEBUG,
-        log_level=settings.LOG_LEVEL.lower(),
+        log_config=None,
     )

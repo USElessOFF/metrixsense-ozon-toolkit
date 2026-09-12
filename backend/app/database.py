@@ -110,6 +110,10 @@ def _make_alembic_config() -> Config:
     cfg.set_main_option("script_location", str(ALEMBIC_SCRIPT_LOCATION))
     cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
     cfg.attributes["db_url"] = settings.DATABASE_URL
+    # Не даём env.py перезаписывать logging-конфигурацию приложения
+    # через fileConfig (disable_existing_loggers=True ломает uvicorn.access,
+    # и access-логи после init_db перестают попадать в наш JSON-файл).
+    cfg.attributes["configure_logging"] = False
     return cfg
 
 

@@ -18,7 +18,8 @@ import SearchQueries from './pages/SearchQueries'
 import Rating from './pages/Rating'
 import Calculator from './pages/Calculator'
 import Analogs from './pages/Analogs'
-import FullReport from './pages/FullReport'
+import Reports from './pages/Reports'
+import Compare from './pages/Compare'
 import Settings from './pages/Settings'
 
 function Boot() {
@@ -79,7 +80,8 @@ export default function App() {
           <Route path="rating" element={<Rating />} />
           <Route path="calculator" element={<Calculator />} />
           <Route path="analogs" element={<Analogs />} />
-          <Route path="report" element={<FullReport />} />
+          <Route path="report" element={<Reports />} />
+          <Route path="compare" element={<Compare />} />
           <Route path="settings" element={<Settings />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

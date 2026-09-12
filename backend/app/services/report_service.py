@@ -177,6 +177,20 @@ class ReportService:
     async def get_latest_report(self) -> ReportRequestOzon | None:
         return await self.adapter.get_latest_report_request()
 
+    async def list_reports(self, limit: int = 20) -> list[ReportRequestOzon]:
+        return await self.adapter.list_report_requests(limit)
+
+    async def get_report_data(self, request_uuid: str) -> list[dict[str, Any]] | None:
+        """Данные готового отчёта из кэша (JSON строки unit-экономики)"""
+        cached = await self.adapter.get_cache(f"report_{request_uuid}")
+        if not cached:
+            return None
+        try:
+            return json.loads(cached)
+        except (TypeError, ValueError):
+            logger.warning("::get_report_data> Invalid cached payload", request_uuid=request_uuid)
+            return None
+
     # Секции для REST API: DI-клиент на запрос, кэш AnalyticsCache
     # Read-through с TTL - правки цен подтягиваются не позже TTL
 
@@ -560,9 +574,9 @@ class ReportService:
         generated_at = datetime.now(tz=timezone.utc)
         cache_key = self._section_cache_key("search_queries", f"{date_from}_{date_to}")
 
-        cached = await self._get_cached_section(cache_key, SearchQueriesSectionResponse)
-        if cached is not None:
-            return cached
+        # cached = await self._get_cached_section(cache_key, SearchQueriesSectionResponse)
+        # if cached is not None:
+        #     return cached
 
         cards_items = await seller.get_all_product_info_items()
         skus = [str(item.sku) for item in cards_items if item.sku]

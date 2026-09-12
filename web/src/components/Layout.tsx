@@ -13,7 +13,8 @@ const NAV = [
   { to: '/rating', label: 'Рейтинг', icon: '⭐' },
   { to: '/calculator', label: 'Калькулятор', icon: '🧮' },
   { to: '/analogs', label: 'Аналоги', icon: '🧲' },
-  { to: '/report', label: 'Полный отчёт', icon: '📈' },
+  { to: '/report', label: 'Отчёты', icon: '📈' },
+  { to: '/compare', label: 'Сравнение', icon: '⚖️' },
   { to: '/settings', label: 'Настройки', icon: '⚙️' },
 ]
 

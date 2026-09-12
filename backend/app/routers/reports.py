@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import FileResponse
+
+from backend.app import config
 
 from backend.app.adapters.metrix_adapter import MetrixAdapter
 from backend.app.depends.db import get_metrix_adapter_for_user
@@ -236,5 +241,69 @@ def get_reports_router() -> APIRouter:
         if report is None:
             raise HTTPException(status_code=404, detail="Report not found")
         return ReportStatusResponse.model_validate(report, from_attributes=True)
+
+    @router.get(
+        "/requests",
+        response_model=list[ReportStatusResponse],
+    )
+    async def list_reports(
+        limit: int = 20,
+        db: MetrixAdapter = Depends(get_metrix_adapter_for_user),  # noqa: B008
+    ) -> list[ReportStatusResponse]:
+        """Последние отчёты пользователя (новые сверху) — для истории в UI"""
+        service = ReportService(db)
+        reports = await service.list_reports(min(limit, 100))
+        return [ReportStatusResponse.model_validate(r, from_attributes=True) for r in reports]
+
+    @router.get(
+        "/requests/{request_id}/download",
+    )
+    async def download_report(
+        request_id: str,
+        fmt: str = "xlsx",
+        db: MetrixAdapter = Depends(get_metrix_adapter_for_user),  # noqa: B008
+    ) -> FileResponse:
+        """Скачать готовый отчёт (xlsx или csv); файл отдаётся только владельцу"""
+        service = ReportService(db)
+        report = await service.get_report(request_id)
+        if report is None:
+            raise HTTPException(status_code=404, detail="Report not found")
+        if report.status != "completed":
+            raise HTTPException(status_code=409, detail="Report is not completed yet")
+        fmt = fmt.lower()
+        if fmt not in {"xlsx", "csv"}:
+            raise HTTPException(status_code=422, detail="fmt must be xlsx or csv")
+        path = Path(config.PROJECT_ROOT) / "files" / request_id / f"full_report.{fmt}"
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="Report file not found")
+        return FileResponse(
+            path,
+            filename=f"metrixsense_report_{request_id[:8]}.{fmt}",
+            media_type=(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                if fmt == "xlsx"
+                else "text/csv"
+            ),
+        )
+
+    @router.get(
+        "/requests/{request_id}/data",
+        response_model=list[dict],
+    )
+    async def get_report_data(
+        request_id: str,
+        db: MetrixAdapter = Depends(get_metrix_adapter_for_user),  # noqa: B008
+    ) -> list[dict]:
+        """Данные готового отчёта (строки unit-экономики) — для сравнения в UI"""
+        service = ReportService(db)
+        report = await service.get_report(request_id)
+        if report is None:
+            raise HTTPException(status_code=404, detail="Report not found")
+        if report.status != "completed":
+            raise HTTPException(status_code=409, detail="Report is not completed yet")
+        data = await service.get_report_data(request_id)
+        if data is None:
+            raise HTTPException(status_code=404, detail="Report data not found")
+        return data
 
     return router

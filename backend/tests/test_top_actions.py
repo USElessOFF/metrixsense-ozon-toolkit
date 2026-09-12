@@ -22,9 +22,9 @@ class TestHighCosts:
         section.data = rows
         return section
 
-    def _row(self, sku=1, price=1000.0, commission=10.0, acquiring=1.5, logistics_range="100.0\u2013200.0"):
+    def _row(self, product_id=1, price=1000.0, commission=10.0, acquiring=1.5, logistics_range="100.0\u2013200.0"):
         row = MagicMock()
-        row.sku = sku
+        row.product_id = product_id
         row.price = price
         row.commission_fbo_percent = commission
         row.acquiring_percent = acquiring
@@ -35,9 +35,9 @@ class TestHighCosts:
         """Расходы > 45% цены попадают в действие"""
         svc = TopActionsService(MagicMock())
         # 10% + 1.5% = 115 руб + логистика 100 = 215/1000 = 21.5% — не должно
-        ok = self._row(sku=1, price=1000, commission=10, logistics_range="100.0\u2013200.0")
+        ok = self._row(product_id=1, price=1000, commission=10, logistics_range="100.0\u2013200.0")
         # 30% = 300 + логистика 200 = 500/1000 = 50% — должно
-        heavy = self._row(sku=2, price=1000, commission=30, logistics_range="200.0\u2013300.0")
+        heavy = self._row(product_id=2, price=1000, commission=30, logistics_range="200.0\u2013300.0")
         actions = svc._high_costs_action(self._prices([ok, heavy]))
         assert len(actions) == 1
         assert actions[0].action_type == "high_costs"
@@ -46,8 +46,8 @@ class TestHighCosts:
     def test_sorted_by_worst_share(self):
         svc = TopActionsService(MagicMock())
         rows = [
-            self._row(sku=1, price=1000, commission=50, logistics_range="200.0\u2013300.0"),
-            self._row(sku=2, price=1000, commission=46, logistics_range="200.0\u2013300.0"),
+            self._row(product_id=1, price=1000, commission=50, logistics_range="200.0\u2013300.0"),
+            self._row(product_id=2, price=1000, commission=46, logistics_range="200.0\u2013300.0"),
         ]
         actions = svc._high_costs_action(self._prices(rows))
         assert actions[0].skus[0] == 1  # худшая доля — первой

@@ -118,6 +118,16 @@ class MetrixAdapter(BaseAdapter):
         )
         return result.scalar_one_or_none()
 
+    async def list_report_requests(self, limit: int = 20) -> list[ReportRequestOzon]:
+        """Последние отчётные запросы пользователя (новые сверху)"""
+        result = await self.session.execute(
+            select(ReportRequestOzon)
+            .where(ReportRequestOzon.user_id == self.user_id)
+            .order_by(ReportRequestOzon.created_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
     async def update_report_status(
         self, request_uuid: str, status: str, info: str | None = None
     ) -> ReportRequestOzon | None:

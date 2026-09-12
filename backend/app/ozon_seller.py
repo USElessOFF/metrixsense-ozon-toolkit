@@ -115,18 +115,25 @@ class OzonSellerClient:
     async def get_product_list(
         self, request: ProductListRequest | None = None
     ) -> ProductListResponse:
-        """Получить список товаров (с пагинацией)"""
+        """Получить список товаров (с пагинацией).
+
+        Ozon оборачивает ответ в {"result": {...}} — распаковываем,
+        иначе модель парсит всё в пустое (items=[]).
+        """
         if request is None:
             request = ProductListRequest()
         payload = request.model_dump(mode="json", exclude_none=True, by_alias=True)
         resp = await self._request("POST", "/v3/product/list", json=payload)
         resp_json = resp.json()
+        inner = resp_json.get("result") if isinstance(resp_json, dict) else None
+        if not isinstance(inner, dict):
+            inner = resp_json
         logger.info(
             "::get_product_list",
             request=payload,
             response=resp_json,
         )
-        return ProductListResponse.model_validate(resp_json)
+        return ProductListResponse.model_validate(inner)
 
     async def get_analytics_data(
         self, request: AnalyticsDataRequest

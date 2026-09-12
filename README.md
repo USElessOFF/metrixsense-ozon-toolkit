@@ -18,6 +18,11 @@
 
 <img src="docs/screenshots/login.png" alt="MetrixSense — экран входа" width="820" />
 
+<p>
+  <img src="docs/screenshots/prices-comissions.png" alt="MetrixSense — цены и комиссии" width="49.5%" />
+  <img src="docs/screenshots/settings.png" alt="MetrixSense — настройки" width="49.5%" />
+</p>
+
 <a href="https://github.com/USElessOFF/metrixsense-ozon-toolkit/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=USElessOFF/metrixsense-ozon-toolkit" alt="Контрибьюторы" />
 </a>

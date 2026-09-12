@@ -108,7 +108,7 @@ class TopActionsService:
             costs = commission + (logistics_min or 0)
             share = costs / row.price
             if share > 0.45:
-                heavy.append((row.sku, row.price, round(share * 100, 1)))
+                heavy.append((row.product_id, row.price, round(share * 100, 1)))
         if not heavy:
             return []
         heavy.sort(key=lambda x: x[2], reverse=True)
@@ -119,9 +119,9 @@ class TopActionsService:
                 title=f"Расходы Ozon съедают до {worst_share}% цены у {len(heavy)} товаров",
                 priority="high",
                 sku_count=len(heavy),
-                skus=[sku for sku, _, _ in heavy[:20]],
+                skus=[pid for pid, _, _ in heavy[:20]],
                 impact="Пересмотрите цену или схему продажи",
-                details={"sku_share": {str(sku): share for sku, _, share in heavy[:20]}},
+                details={"sku_share": {str(pid): share for pid, _, share in heavy[:20]}},
             )
         ]
 

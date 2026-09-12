@@ -21,8 +21,17 @@ from backend.app.models import Base  # noqa: E402
 
 config = context.config
 
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+# Приложение (database.init_db -> lifespan) уже настроило logging через
+# backend/app/logger.py. fileConfig(alembic.ini) вызывается по умолчанию с
+# disable_existing_loggers=True и ПЕРЕЗАПИСЫВАЕТ конфигурацию всего приложения:
+# uvicorn.access отключается, наши handler'ы пропадают, и access-логи после
+# первой миграции уходят в stderr в сыром виде. Поэтому из приложения
+# параметр configure_logging передаётся как False, и fileConfig не вызывается.
+if (
+    config.config_file_name is not None
+    and config.attributes.get("configure_logging", True)
+):
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 

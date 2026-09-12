@@ -12,11 +12,9 @@ services:
       - CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
     volumes:
       - ./backend/data:/app/data
-      # Reports are written to {PROJECT_ROOT}/files => /app/backend/files
       - ./backend/files:/app/backend/files
       - ./backend/logs:/app/backend/logs
     ports:
-      # Reachable only from this computer. Use "8000:8000" to expose to LAN.
       - "127.0.0.1:8000:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]

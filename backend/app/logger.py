@@ -1,11 +1,11 @@
 import logging.config
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import structlog
-from pytz import utc
 
 
 def setup_logging(config: Any) -> None:
@@ -33,8 +33,14 @@ def setup_logging(config: Any) -> None:
             "stream": sys.stdout,
         }
     }
-    if log_dir:
-        log_file = log_dir / f"app_{datetime.now(utc).strftime('%Y%m%d_%H%M%S')}.json"
+    # Файловый лог: один файл на запуск (reload-родитель и воркер пишут в один
+    # файл через METRIXSENSE_LOG_FILE); delay — файл создаётся при первой записи;
+    # под pytest файл не нужен (тесты плодили почти пустые логи)
+    if log_dir and not os.environ.get("PYTEST_VERSION"):
+        log_file = log_dir / os.environ.get(
+            "METRIXSENSE_LOG_FILE",
+            f"app_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+        )
         handlers["file"] = {
             "class": "logging.handlers.RotatingFileHandler",
             "formatter": "json",
@@ -43,6 +49,7 @@ def setup_logging(config: Any) -> None:
             "maxBytes": 10 * 1024 * 1024,
             "backupCount": 5,
             "encoding": "utf-8",
+            "delay": True,
         }
 
     logging_config: dict[str, Any] = {
@@ -63,8 +70,14 @@ def setup_logging(config: Any) -> None:
         "handlers": handlers,
         "root": {"handlers": list(handlers.keys()), "level": log_level},
         "loggers": {
-            "uvicorn.access": {"handlers": [], "propagate": False, "level": "WARNING"},
-            "sqlalchemy.engine": {"level": "WARNING" if config.ENVIRONMENT == "production" else "INFO"},
+            "uvicorn": {"propagate": True},
+            "uvicorn.access": {
+                "level": "INFO",
+                "propagate": True,
+            },
+            "sqlalchemy.engine": {
+                "level": "INFO" if (config.ENVIRONMENT == "production" or config.LOG_SQL) else "WARNING"
+            },
         },
     }
     logging.config.dictConfig(logging_config)

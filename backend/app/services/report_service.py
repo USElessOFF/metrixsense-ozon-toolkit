@@ -211,11 +211,19 @@ class ReportService:
         cache_key: str | None = None,
         ttl: timedelta | None = None,
     ) -> None:
-        """Сохранить секцию в AnalyticsCache (TTL по умолчанию)"""
+        """Сохранить секцию в AnalyticsCache (TTL по умолчанию).
+
+        Пустые секции (row_count == 0) кэшируем на 5 минут вместо 6 часов:
+        пустота, полученная при сбое Ozon/невалидных ключах, не должна
+        «залипать» — повторный запрос пойдёт в API заново.
+        """
+        ttl = ttl if ttl is not None else self.SECTION_CACHE_TTL
+        if payload.get("row_count") == 0:
+            ttl = min(ttl, timedelta(minutes=5))
         await self.adapter.set_cache(
             cache_key or self._section_cache_key(section_name),
             payload,
-            ttl=ttl if ttl is not None else self.SECTION_CACHE_TTL,
+            ttl=ttl,
         )
 
     async def get_prices_commissions_section(

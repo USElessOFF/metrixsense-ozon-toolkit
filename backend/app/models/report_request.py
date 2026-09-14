@@ -40,6 +40,7 @@ class ReportRequestOzon(Base):
     date_from: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     date_to: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default=ReportStatus.PENDING.value)
+    progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     type: Mapped[ReportType] = mapped_column(String(20), nullable=False)
     info: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)

@@ -69,6 +69,7 @@ export default function Reports() {
       setReport({
         request_uuid: created.request_uuid,
         status: created.status,
+        progress: 0,
         info: null,
         created_at: new Date().toISOString(),
         updated_at: null,
@@ -113,6 +114,12 @@ export default function Reports() {
             </Badge>
             <code>{report.request_uuid}</code>
           </div>
+          {ACTIVE.has(report.status) && (
+            <div className="progress">
+              <div className="progress-bar" style={{ width: `${report.progress ?? 0}%` }} />
+              <span className="progress-label">{report.progress ?? 0} %</span>
+            </div>
+          )}
           {report.date_from && report.date_to && (
             <p className="dim">
               Период: {report.date_from.slice(0, 10)} — {report.date_to.slice(0, 10)}

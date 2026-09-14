@@ -784,13 +784,14 @@ class ReportService:
                         client_secret=secrets.performance_secret or "",
                     )
 
-                await adapter.update_report_status(request_uuid, ReportStatus.IN_PROGRESS.value)
+                await adapter.update_report_status(request_uuid, ReportStatus.IN_PROGRESS.value, progress=5)
                 logger.info("::_compile_report> Report compilation started", request_uuid=request_uuid)
 
                 date_from = request.date_from.strftime(DATE_FORMAT)
                 date_to = request.date_to.strftime(DATE_FORMAT)
 
                 seller_df = await self._collect_full_seller_data(seller, date_from, date_to, request_uuid)
+                await adapter.update_report_status(request_uuid, ReportStatus.IN_PROGRESS.value, progress=20)
                 if seller_df.empty:
                     logger.exception("::_compile_report> No data for report", request_uuid=request_uuid)
                     raise ValueError("Unable get seller data for report")
@@ -804,13 +805,28 @@ class ReportService:
                         "ID Товара",
                     ].tolist()
 
+                collected_coros = []
                 if has_premium and performance is not None:
-                    collected = await asyncio.gather(
-                        self._collect_full_performance_data(performance, date_from, date_to, request_uuid),
-                        self._collect_stocks_data(seller, request_uuid, product_ids, ordered_ids=ordered_ids),
-                        self._collect_product_cards_data(seller, product_ids),
-                        self._collect_finance_operations_data(seller, date_from, date_to),
+                    collected_coros.append(
+                        self._collect_full_performance_data(performance, date_from, date_to, request_uuid)
                     )
+                collected_coros.append(
+                    self._collect_stocks_data(seller, request_uuid, product_ids, ordered_ids=ordered_ids)
+                )
+                collected_coros.append(self._collect_product_cards_data(seller, product_ids))
+                collected_coros.append(self._collect_finance_operations_data(seller, date_from, date_to))
+                # Прогресс сборов: 25% → 55%, равными долями на каждый завершившийся сбор
+                step = 30 // len(collected_coros)
+
+                async def _tracked(idx: int, coro: Any) -> Any:
+                    result = await coro
+                    await adapter.update_report_status(
+                        request_uuid, ReportStatus.IN_PROGRESS.value, progress=25 + step * (idx + 1)
+                    )
+                    return result
+
+                collected = await asyncio.gather(*(_tracked(i, c) for i, c in enumerate(collected_coros)))
+                if has_premium and performance is not None:
                     perf_df, perf_raw_cols = collected[0]
                     stocks_df = collected[1]
                     cards_df = collected[2]
@@ -818,11 +834,6 @@ class ReportService:
                 else:
                     perf_df = pd.DataFrame()
                     perf_raw_cols: list[str] = []
-                    collected = await asyncio.gather(
-                        self._collect_stocks_data(seller, request_uuid, product_ids, ordered_ids=ordered_ids),
-                        self._collect_product_cards_data(seller, product_ids),
-                        self._collect_finance_operations_data(seller, date_from, date_to),
-                    )
                     stocks_df = collected[0]
                     cards_df = collected[1]
                     finance_df, finance_totals = collected[2]
@@ -836,6 +847,7 @@ class ReportService:
                 )
                 
                 merged_df = pd.merge(seller_df, perf_df, how="outer", on=["ID Товара", "Наименование"])
+                await adapter.update_report_status(request_uuid, ReportStatus.IN_PROGRESS.value, progress=70)
                 logger.info("::_compile_report> Merged seller and performance", shape=merged_df.shape, cols=merged_df.columns.tolist())
 
                 for frame in (merged_df, stocks_df):
@@ -982,6 +994,7 @@ class ReportService:
                     shape=merged_df.shape,
                     head=merged_df.head(3).to_dict(orient="records")
                 )
+                await adapter.update_report_status(request_uuid, ReportStatus.IN_PROGRESS.value, progress=90)
                 cache_key = f"report_{request_uuid}"
 
                 merged_df.to_csv(f"{config.PROJECT_ROOT}/files/{request_uuid}/full_report.csv", sep=";", decimal=",", index=False)
@@ -997,7 +1010,9 @@ class ReportService:
                     json.dumps(finance_totals, ensure_ascii=False, default=str),
                 )
 
-                await adapter.update_report_status(request_uuid, ReportStatus.COMPLETED.value)
+                await adapter.update_report_status(
+                    request_uuid, ReportStatus.COMPLETED.value, progress=100
+                )
                 logger.info("::_compile_report> Report compiled successfully", request_uuid=request_uuid)
 
             except Exception as e:

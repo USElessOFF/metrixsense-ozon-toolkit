@@ -129,7 +129,11 @@ class MetrixAdapter(BaseAdapter):
         return list(result.scalars().all())
 
     async def update_report_status(
-        self, request_uuid: str, status: str, info: str | None = None
+        self,
+        request_uuid: str,
+        status: str,
+        info: str | None = None,
+        progress: int | None = None,
     ) -> ReportRequestOzon | None:
         request = await self.get_report_request(request_uuid)
         if request is None:
@@ -137,6 +141,8 @@ class MetrixAdapter(BaseAdapter):
         update_data: dict[str, Any] = {"status": status}
         if info is not None:
             update_data["info"] = info
+        if progress is not None:
+            update_data["progress"] = max(0, min(100, int(progress)))
         return await self.update_object(request, update_data)
 
     async def get_cache(self, cache_key: str) -> str | None:

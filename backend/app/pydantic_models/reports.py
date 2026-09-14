@@ -25,6 +25,7 @@ class ReportStatusResponse(BaseModel):
 
     request_uuid: str = Field(..., description="Report request UUID")
     status: str = Field(..., description="pending | in_progress | completed | failed")
+    progress: int = Field(default=0, description="Компиляция: 0–100 %")
     info: str | None = Field(default=None, description="Additional info or error message")
     created_at: datetime | None = None
     updated_at: datetime | None = None

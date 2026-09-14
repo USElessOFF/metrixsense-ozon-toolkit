@@ -217,6 +217,7 @@ export interface AnalogsResponse {
 export interface ReportStatus {
   request_uuid: string
   status: string
+  progress: number
   info: string | null
   created_at: string | null
   updated_at: string | null

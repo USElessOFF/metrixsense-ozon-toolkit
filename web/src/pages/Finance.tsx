@@ -1,12 +1,25 @@
 import { useState } from 'react'
 import { api } from '../api/client'
 import { useFetch } from '../api/useFetch'
-import type { FinanceExpensesSection, FinanceExpenseRow } from '../api/types'
+import type { FinanceExpensesSection, FinanceExpenseRow, FinanceNonItemRow } from '../api/types'
 import { DataTable } from '../components/DataTable'
 import type { Column } from '../components/DataTable'
 import { PeriodPicker } from '../components/PeriodPicker'
 import { Card, ErrorState, Kpi, Loading, PageHead, Warnings } from '../components/ui'
-import { defaultRange, fmtMoney } from '../lib/format'
+import { defaultRange, fmtDate, fmtMoney } from '../lib/format'
+
+
+const nonItemColumns: Column<FinanceNonItemRow>[] = [
+  { key: 'date', title: 'Дата', value: r => r.date, render: r => fmtDate(r.date) },
+  { key: 'name', title: 'Начисление', value: r => r.name },
+  {
+    key: 'amount',
+    title: 'Сумма',
+    align: 'right',
+    value: r => r.amount,
+    render: r => <span className={r.amount >= 0 ? 'pos' : 'neg'}>{fmtMoney(r.amount)}</span>,
+  },
+]
 
 
 const columns: Column<FinanceExpenseRow>[] = [
@@ -49,6 +62,19 @@ export default function Finance() {
             </div>
           )}
           <Warnings items={data.warnings} />
+          {data.non_item?.length > 0 && (
+            <Card title="Начисления без привязки к товару (реклама, подписки и пр.)">
+              <DataTable
+                columns={nonItemColumns}
+                rows={data.non_item}
+                rowKey={(r, i) => `${r.date}-${r.name}-${i}`}
+                filter={(r, q) =>
+                  [r.name, r.date].some(v => String(v ?? '').toLowerCase().includes(q))
+                }
+                csvName={`finance-non-item-${range.date_from}_${range.date_to}.csv`}
+              />
+            </Card>
+          )}
           <Card>
             <DataTable
               columns={columns}

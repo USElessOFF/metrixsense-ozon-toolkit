@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import type { ReportStatus } from '../api/types'
 import { PeriodPicker } from '../components/PeriodPicker'
 import { Badge, Card, PageHead } from '../components/ui'
+import { toast } from '../components/Toast'
 import { fmtDateTime } from '../lib/format'
 
 const STATUS_TONE: Record<string, string> = {
@@ -84,6 +85,25 @@ export default function Reports() {
     }
   }
 
+  const removeReport = async (uuid: string) => {
+    if (!confirm('Удалить отчёт из истории?')) return
+    try {
+      await api.del(`/api/reports/requests/${uuid}`)
+      if (report?.request_uuid === uuid) setReport(null)
+      loadHistory()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Не удалось удалить отчёт', 'error')
+    }
+  }
+
+  const [failedDetails, setFailedDetails] = useState<string | null>(null)
+
+  const reportIssueLink = (errText: string) =>
+    'https://github.com/USElessOFF/metrixsense-ozon-toolkit/issues/new?title=' +
+    encodeURIComponent('Ошибка компиляции отчёта') +
+    '&body=' +
+    encodeURIComponent(`Ошибка:\n${errText}\n\nВремя: ${new Date().toISOString()}`)
+
   return (
     <>
       <PageHead title="Отчёты" sub="Сборка в фоне — можно закрыть страницу и вернуться" />
@@ -126,7 +146,30 @@ export default function Reports() {
             </p>
           )}
           {report.created_at && <p className="dim">Создан: {fmtDateTime(report.created_at)}</p>}
-          {report.info && <p className={report.status === 'failed' ? 'form-error' : 'dim'}>{report.info}</p>}
+          {report.info && report.status === 'failed' && (
+            <>
+              <button
+                type="button"
+                className="btn ghost tiny"
+                onClick={() => setFailedDetails(failedDetails ? null : report.info)}
+              >
+                {failedDetails ? 'Скрыть ошибку' : 'Показать ошибку'}
+              </button>
+              {failedDetails && (
+                <div className="form-error report-error">
+                  <pre>{failedDetails}</pre>
+                  <p className="dim">
+                    Нашли проблему?{' '}
+                    <a href={reportIssueLink(failedDetails)} target="_blank" rel="noreferrer">
+                      Напишите issue на GitHub
+                    </a>{' '}
+                    — приложим этот текст, поможем быстрее.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+          {report.info && report.status !== 'failed' && <p className="dim">{report.info}</p>}
           {report.status === 'completed' && (
             <p className="report-download">
               <a className="btn primary" href={`/api/reports/requests/${report.request_uuid}/download?fmt=xlsx`}>
@@ -149,6 +192,7 @@ export default function Reports() {
                 <th>Период</th>
                 <th>Статус</th>
                 <th>Файл</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -179,9 +223,30 @@ export default function Reports() {
                           CSV
                         </a>
                       </>
+                    ) : r.info && r.status === 'failed' ? (
+                      <a
+                        className="btn ghost tiny"
+                        href={reportIssueLink(r.info)}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={r.info}
+                      >
+                        ⓘ issue
+                      </a>
                     ) : (
                       <span className="dim">—</span>
                     )}
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn danger tiny"
+                      onClick={() => removeReport(r.request_uuid)}
+                      disabled={r.status === 'in_progress'}
+                      title={r.status === 'in_progress' ? 'Дождитесь завершения сборки' : 'Удалить отчёт'}
+                    >
+                      ✕
+                    </button>
                   </td>
                 </tr>
               ))}

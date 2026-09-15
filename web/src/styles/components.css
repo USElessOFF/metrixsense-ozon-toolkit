@@ -794,3 +794,10 @@ tbody tr.opened { background: var(--accent-soft); }
   font-size: 13px;
   font-weight: 600;
 }
+
+.report-error pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 240px;
+  overflow: auto;
+}

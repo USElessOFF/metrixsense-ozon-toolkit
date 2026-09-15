@@ -524,13 +524,14 @@ class TestPostingFbsUnfulfilledList:
 
 class TestProductInfoStocks:
     def test_page_size_bounds(self) -> None:
-        req = ProductInfoStocksRequest(sku="1585887323", page=2, page_size=1000)
+        """v4: курсорная пагинация cursor + limit (0 < limit <= 1000)"""
+        req = ProductInfoStocksRequest(cursor="abc", limit=1000)
         payload = req.model_dump(mode="json", exclude_none=True)
 
-        assert payload["sku"] == "1585887323"
-        assert payload["page_size"] == 1000
+        assert payload["limit"] == 1000
+        assert payload["cursor"] == "abc"
         with pytest.raises(ValueError):
-            ProductInfoStocksRequest(sku="123", page_size=1001)
+            ProductInfoStocksRequest(limit=1001)
 
     @pytest.mark.asyncio
     async def test_client_parses_warehouse_stocks(self) -> None:

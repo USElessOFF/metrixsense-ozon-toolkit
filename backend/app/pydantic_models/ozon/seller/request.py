@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 
 from pydantic import Field, field_validator, model_validator
@@ -36,9 +37,17 @@ def _to_date_str(v: datetime | str) -> str:
 
 
 def _to_iso_str(v: datetime | str) -> str:
-    """Приведение datetime к ISO 8601 строке"""
+    """Приведение datetime/даты к ISO 8601 date-time.
+
+    Аналитические методы Ozon (/v1/analytics/*) валидируют
+    google.protobuf.Timestamp — короткая дата ``YYYY-MM-DD``
+    отклоняется, поэтому разворачиваем её в полный timestamp.
+    """
     if isinstance(v, datetime):
         return v.isoformat()
+    v = v.strip()
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
+        return f"{v}T00:00:00Z"
     return v
 
 
@@ -244,18 +253,14 @@ class ProductQueriesRequest(OzonBaseModel):
 
 
 class TurnoverStocksRequest(OzonBaseModel):
-    """POST /v1/analytics/turnover/stocks — оборачиваемость остатков (бета).
+    """POST /v1/analytics/turnover/stocks — оборачиваемость остатков.
 
-    Позволяет анализировать скорость продаж товаров со склада.
-    Метод может не отдавать все карточки — есть ограничения.
+    Схема Ozon: ``limit`` (0 < limit <= 1000) — список товаров с метриками
+    оборачиваемости (sku, ads, idc, turnover, grades) без пагинации.
+    Поле ``skus`` API не распознаёт.
     """
 
-    skus: list[int | str] = Field(..., description="Список SKU для анализа оборачиваемости.")
-
-    @field_validator("skus", mode="after")
-    @classmethod
-    def skus_to_str(cls, v: list[int | str]) -> list[str]:
-        return [str(s) for s in v]
+    limit: int = Field(default=1000, ge=1, le=1000, description="Товаров на странице (0 < limit <= 1000).")
 
 
 def _sku_list_to_str(v: list[int | str], max_len: int | None = None) -> list[str]:
@@ -372,6 +377,39 @@ class FinanceTransactionTotalsRequest(OzonBaseModel):
         return self
 
 
+class FinanceAccrualByDayRequest(OzonBaseModel):
+    """POST /v1/finance/accrual/by-day — начисления за один день.
+
+    Заменяет закрытый Ozon метод /v3/finance/transaction/list (obsolete).
+    Один запрос отдаёт все начисления дня: ``limit``/``page_size`` API
+    принимает, но фактически отдаёт весь день целиком.
+    """
+
+    date: str = Field(..., description="День начислений (YYYY-MM-DD).")
+    page: int = Field(default=1, description="Номер страницы.")
+    page_size: int = Field(default=1000, ge=1, description="Количество начислений на странице.")
+    last_id: str | None = Field(
+        default=None, description="Курсор следующей страницы (из предыдущего ответа)."
+    )
+
+
+class FinanceAccrualTypesRequest(OzonBaseModel):
+    """POST /v1/finance/accrual/types — справочник типов начислений (тело пустое)."""
+
+
+class FinanceCashFlowStatementListRequest(OzonBaseModel):
+    """POST /v1/finance/cash-flow-statement/list — ДДС по периодам.
+
+    Заменяет закрытый Ozon метод /v3/finance/transaction/list.
+    Ответ — недельные периоды с агрегатами: заказы, возвраты, комиссия,
+    услуги, доставка.
+    """
+
+    date: FinanceTransactionDateFilter = Field(..., description="Период отчёта.")
+    page: int = Field(default=1, description="Номер страницы.")
+    page_size: int = Field(default=50, ge=1, le=1000, description="Периодов на странице.")
+
+
 class ReportReturnsCreateRequest(OzonBaseModel):
     """POST /v2/report/returns/create — создание отчёта по возвратам.
 
@@ -479,14 +517,29 @@ class PostingFbsUnfulfilledListRequest(OzonBaseModel):
     with_: PostingFbsWithParams | None = Field(default=None, alias="with")
 
 
-class ProductInfoStocksRequest(OzonBaseModel):
-    """POST /v4/product/info/stocks — информация об остатках по товарам"""
+class ProductInfoStocksFilter(OzonBaseModel):
+    """Фильтр остатков (/v4/product/info/stocks)"""
 
     offer_id: str | None = Field(default=None, description="Артикул продавца.")
     product_id: int | str | None = Field(default=None, description="Идентификатор товара.")
     sku: int | str | None = Field(default=None, description="SKU товара.")
-    page: int = Field(default=1, description="Номер страницы.")
-    page_size: int = Field(default=100, le=1000, description="Количество товаров на странице.")
+    visibility: str | None = Field(default=None, description="Видимость (ALL и т.п.).")
+
+
+class ProductInfoStocksRequest(OzonBaseModel):
+    """POST /v4/product/info/stocks — информация об остатках по товарам.
+
+    Ozon v4: ``filter`` обязателен, пагинация курсорная — ``cursor``
+    из предыдущего ответа и ``limit`` (0 < limit <= 1000).
+    """
+
+    filter_: ProductInfoStocksFilter = Field(
+        default_factory=lambda: ProductInfoStocksFilter(visibility="ALL"),
+        alias="filter",
+        description="Фильтр (обязателен).",
+    )
+    cursor: str = Field(default="", description="Курсор следующей страницы из предыдущего ответа.")
+    limit: int = Field(default=1000, ge=1, le=1000, description="Товаров на странице (0 < limit <= 1000).")
 
 
 class ProductInfoListRequest(OzonBaseModel):

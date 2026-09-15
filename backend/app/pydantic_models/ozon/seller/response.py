@@ -312,11 +312,16 @@ class TurnoverStocksResponse(OzonBaseModel):
 
 
 class RatingSummaryItem(OzonBaseModel):
-    """Элемент рейтинга в /v1/rating/summary"""
+    """Элемент рейтинга в /v1/rating/summary — реальная схема ответа Ozon"""
 
-    rating_type: str | None = Field(default=None, description="Тип рейтинга.")
-    score: float | None = Field(default=None, description="Текущий балл.")
-    description: str | None = Field(default=None, description="Описание.")
+    name: str | None = Field(default=None, description="Название показателя.")
+    current_value: float | None = Field(default=None, description="Текущее значение.")
+    past_value: float | None = Field(default=None, description="Прошлое значение.")
+    status: str | None = Field(default=None, description="Статус (OK и т.п.).")
+    rating: str | None = Field(default=None, description="Цвет рейтинга (rating_price_green и т.п.).")
+    rating_direction: str | None = Field(default=None, description="HIGHER_IS_BETTER / LOWER_IS_BETTER / NEUTRAL.")
+    value_type: str | None = Field(default=None, description="RATIO / и т.п.")
+    change: dict[str, Any] | None = Field(default=None, description="Динамика: direction, meaning.")
 
 
 class RatingSummaryGroup(OzonBaseModel):
@@ -402,6 +407,152 @@ class FinanceOperation(OzonBaseModel):
     posting: OperationPosting | None = Field(default=None, description="Информация об отправлении.")
     items: list[OperationItem] = Field(default_factory=list, description="Товары.")
     services: list[OperationService] = Field(default_factory=list, description="Услуги.")
+
+
+class AccrualMoney(OzonBaseModel):
+    """Денежная сумма в начислении (/v1/finance/accrual/by-day)"""
+
+    amount: str | None = Field(default=None, description="Сумма строкой (может быть отрицательной).")
+    currency: str | None = Field(default=None, description="Валюта (RUB).")
+
+
+class AccrualFee(OzonBaseModel):
+    """Начисление по конкретному типу услуги"""
+
+    type_id: int | None = Field(default=None, description="Тип начисления (/v1/finance/accrual/types).")
+    accrued: AccrualMoney | None = Field(default=None, description="Сумма начисления.")
+
+
+class AccrualItemFees(OzonBaseModel):
+    """Начисления по SKU внутри операции"""
+
+    sku: int | None = Field(default=None, description="SKU товара.")
+    fees: list[AccrualFee] | None = Field(
+        default=None, description="Начисления по товару (может прийти null)."
+    )
+
+
+class AccrualNonItemFee(OzonBaseModel):
+    """Начисление, не привязанное к товару (NON_ITEM)"""
+
+    type_id: int | None = Field(default=None, description="Тип начисления.")
+    accrued: AccrualMoney | None = Field(default=None, description="Сумма начисления.")
+
+
+class AccrualDeliveryService(OzonBaseModel):
+    """Услуга внутри доставки отправления"""
+
+    type_id: int | None = Field(default=None, description="Тип начисления.")
+    accrued: AccrualMoney | None = Field(default=None, description="Сумма начисления.")
+
+
+class AccrualProductDelivery(OzonBaseModel):
+    """Доставка по товару отправления"""
+
+    total_accrued: AccrualMoney | None = Field(default=None, description="Итого по доставке.")
+    services: list[AccrualDeliveryService] | None = Field(
+        default=None, description="Составляющие доставки (может прийти null)."
+    )
+
+
+class AccrualPostingProduct(OzonBaseModel):
+    """Товар в отправлении (POSTING-начисления)"""
+
+    sku: int | None = Field(default=None, description="SKU товара.")
+    delivery: AccrualProductDelivery | None = Field(default=None, description="Доставка по товару.")
+    commission: AccrualMoney | None = Field(default=None, description="Комиссия по товару.")
+
+
+class AccrualPosting(OzonBaseModel):
+    """Отправление внутри начисления (POSTING)"""
+
+    delivery_schema: str | None = Field(default=None, description="Схема доставки (Fbo/Fbs).")
+    products: list[AccrualPostingProduct] | None = Field(
+        default=None, description="Товары отправления (может прийти null)."
+    )
+
+
+class Accrual(OzonBaseModel):
+    """Начисление (/v1/finance/accrual/by-day)"""
+
+    accrual_id: int | None = Field(default=None, description="Идентификатор начисления.")
+    date: str | None = Field(default=None, description="Дата начисления (YYYY-MM-DD).")
+    total_amount: AccrualMoney | None = Field(default=None, description="Итог по начислению.")
+    unit_number: str | None = Field(default=None, description="Идентификатор единицы товара.")
+    accrued_category: str | None = Field(
+        default=None, description="Категория: ITEM / POSTING / NON_ITEM."
+    )
+    posting: AccrualPosting | None = Field(default=None, description="Отправление (POSTING).")
+    item_fees: AccrualItemFees | None = Field(default=None, description="Начисления по SKU (ITEM).")
+    non_item_fee: AccrualNonItemFee | None = Field(
+        default=None, description="Начисление без товара (NON_ITEM)."
+    )
+    container_fees: list[AccrualFee] | None = Field(
+        default=None, description="Начисления по контейнерам (может прийти null)."
+    )
+
+
+class FinanceAccrualByDayResponse(OzonBaseModel):
+    """Ответ POST /v1/finance/accrual/by-day"""
+
+    accruals: list[Accrual] = Field(default_factory=list, description="Начисления дня.")
+    last_id: str | None = Field(default=None, description="Курсор следующей страницы.")
+
+
+class AccrualTypeItem(OzonBaseModel):
+    """Тип начисления из справочника /v1/finance/accrual/types"""
+
+    id: int | None = Field(default=None, description="Идентификатор типа.")
+    name: str | None = Field(default=None, description="Техническое название (SaleCommission и т.п.).")
+    description: str | None = Field(default=None, description="Название для человека.")
+
+
+class FinanceAccrualTypesResponse(OzonBaseModel):
+    """Ответ POST /v1/finance/accrual/types"""
+
+    accrual_types: list[AccrualTypeItem] = Field(
+        default_factory=list, description="Справочник типов начислений."
+    )
+
+
+class CashFlowStatementPeriod(OzonBaseModel):
+    """Период ДДС-отчёта"""
+
+    id: int | None = Field(default=None, description="Идентификатор периода.")
+    begin: str | None = Field(default=None, description="Начало периода.")
+    end: str | None = Field(default=None, description="Конец периода.")
+
+
+class CashFlowStatement(OzonBaseModel):
+    """Строка ДДС (/v1/finance/cash-flow-statement/list)"""
+
+    period: CashFlowStatementPeriod | None = Field(default=None, description="Период.")
+    orders_amount: float | None = Field(default=None, description="Заказы, ₽.")
+    returns_amount: float | None = Field(default=None, description="Возвраты, ₽.")
+    commission_amount: float | None = Field(default=None, description="Комиссия, ₽.")
+    services_amount: float | None = Field(default=None, description="Услуги, ₽.")
+    item_delivery_and_return_amount: float | None = Field(
+        default=None, description="Доставка и возврат, ₽."
+    )
+    currency_code: str | None = Field(default=None, description="Валюта (RUB).")
+
+
+class CashFlowStatementResult(OzonBaseModel):
+    """``result`` из ответа /v1/finance/cash-flow-statement/list"""
+
+    cash_flows: list[CashFlowStatement] = Field(default_factory=list, description="Периоды ДДС.")
+    page_count: int | None = Field(default=None, description="Количество страниц.")
+    details: list[dict[str, Any]] = Field(
+        default_factory=list, description="Детализация (у метода пустая)."
+    )
+
+
+class FinanceCashFlowStatementListResponse(OzonBaseModel):
+    """Ответ POST /v1/finance/cash-flow-statement/list"""
+
+    result: CashFlowStatementResult = Field(
+        default_factory=CashFlowStatementResult, description="Результат отчёта."
+    )
 
 
 class FinanceTransactionListResult(OzonBaseModel):

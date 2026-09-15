@@ -128,6 +128,14 @@ class MetrixAdapter(BaseAdapter):
         )
         return list(result.scalars().all())
 
+    async def delete_report_request(self, request_uuid: str) -> bool:
+        """Удалить отчётный запрос пользователя (если он его владелец)"""
+        request = await self.get_report_request(request_uuid)
+        if request is None:
+            return False
+        await self.delete_object(request)
+        return True
+
     async def update_report_status(
         self,
         request_uuid: str,
@@ -144,6 +152,14 @@ class MetrixAdapter(BaseAdapter):
         if progress is not None:
             update_data["progress"] = max(0, min(100, int(progress)))
         return await self.update_object(request, update_data)
+
+    async def delete_cache(self, cache_key: str) -> None:
+        result = await self.session.execute(
+            select(AnalyticsCache).where(AnalyticsCache.cache_key == cache_key)
+        )
+        cache_entry = result.scalar_one_or_none()
+        if cache_entry is not None:
+            await self.delete_object(cache_entry)
 
     async def get_cache(self, cache_key: str) -> str | None:
         result = await self.session.execute(

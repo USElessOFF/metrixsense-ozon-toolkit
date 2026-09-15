@@ -72,10 +72,17 @@ export interface FinanceExpenseRow {
   actual_logistics_per_unit: number | null
 }
 
+export interface FinanceNonItemRow {
+  date: string | null
+  name: string
+  amount: number
+}
+
 export interface FinanceExpensesSection extends SectionMeta {
   date_from: string
   date_to: string
   totals: Record<string, number | string>
+  non_item: FinanceNonItemRow[]
   data: FinanceExpenseRow[]
 }
 
@@ -148,10 +155,13 @@ export interface SearchQueriesSection extends SectionMeta {
 
 export interface CashFlowRow {
   date: string | null
-  operation_type: string | null
-  operation_type_name: string | null
-  amount: number | null
-  balance_after: number | null
+  period_end: string | null
+  orders_amount: number | null
+  returns_amount: number | null
+  commission_amount: number | null
+  services_amount: number | null
+  delivery_and_return_amount: number | null
+  total: number | null
 }
 
 export interface CashFlowSection extends SectionMeta {

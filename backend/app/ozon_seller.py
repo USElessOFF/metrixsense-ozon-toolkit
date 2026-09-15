@@ -19,6 +19,9 @@ from backend.app.pydantic_models.ozon.seller.request import (
     AnalyticsDataRequest,
     AnalyticsSort,
     AnalyticsStocksRequest,
+    FinanceAccrualByDayRequest,
+    FinanceAccrualTypesRequest,
+    FinanceCashFlowStatementListRequest,
     FinanceTransactionListRequest,
     FinanceTransactionTotalsRequest,
     ManageStocksRequest,
@@ -39,6 +42,9 @@ from backend.app.pydantic_models.ozon.seller.request import (
 from backend.app.pydantic_models.ozon.seller.response import (
     AnalyticsGetDataResponse,
     AnalyticsStocksResponse,
+    FinanceAccrualByDayResponse,
+    FinanceAccrualTypesResponse,
+    FinanceCashFlowStatementListResponse,
     FinanceTransactionListResponse,
     FinanceTransactionTotalsResponse,
     ManageStocksResponse,
@@ -264,6 +270,53 @@ class OzonSellerClient:
         )
         return FinanceTransactionTotalsResponse.model_validate(resp_json)
 
+    async def get_finance_accrual_by_day(
+        self, request: FinanceAccrualByDayRequest
+    ) -> FinanceAccrualByDayResponse:
+        """/v1/finance/accrual/by-day — начисления за день (замена закрытого v3-выписки)"""
+        payload = request.model_dump(mode="json", exclude_none=True, by_alias=True)
+        resp = await self._request("POST", "/v1/finance/accrual/by-day", json=payload)
+        resp_json = resp.json()
+        logger.info(
+            "::get_finance_accrual_by_day",
+            request=payload,
+            response={"accruals": len(resp_json.get("accruals") or [])},
+        )
+        return FinanceAccrualByDayResponse.model_validate(resp_json)
+
+    async def get_finance_accrual_types(
+        self, request: FinanceAccrualTypesRequest | None = None
+    ) -> FinanceAccrualTypesResponse:
+        """/v1/finance/accrual/types — справочник типов начислений (id → название)"""
+        payload = (
+            request or FinanceAccrualTypesRequest()
+        ).model_dump(mode="json", exclude_none=True)
+        resp = await self._request("POST", "/v1/finance/accrual/types", json=payload)
+        resp_json = resp.json()
+        logger.info(
+            "::get_finance_accrual_types",
+            response={"accrual_types": len(resp_json.get("accrual_types") or [])},
+        )
+        return FinanceAccrualTypesResponse.model_validate(resp_json)
+
+    async def get_finance_cash_flow_statement_list(
+        self, request: FinanceCashFlowStatementListRequest
+    ) -> FinanceCashFlowStatementListResponse:
+        """/v1/finance/cash-flow-statement/list — ДДС по недельным периодам"""
+        payload = request.model_dump(mode="json", exclude_none=True, by_alias=True)
+        resp = await self._request("POST", "/v1/finance/cash-flow-statement/list", json=payload)
+        resp_json = resp.json()
+        result = resp_json.get("result") or {}
+        logger.info(
+            "::get_finance_cash_flow_statement_list",
+            request=payload,
+            response={
+                "cash_flows": len(result.get("cash_flows") or []),
+                "page_count": result.get("page_count"),
+            },
+        )
+        return FinanceCashFlowStatementListResponse.model_validate(resp_json)
+
     async def create_returns_report(
         self, request: ReportReturnsCreateRequest
     ) -> ReportReturnsCreateResponse:
@@ -320,7 +373,7 @@ class OzonSellerClient:
     async def get_product_info_stocks(
         self, request: ProductInfoStocksRequest
     ) -> ProductInfoStocksResponse:
-        payload = request.model_dump(mode="json", exclude_none=True)
+        payload = request.model_dump(mode="json", exclude_none=True, by_alias=True)
         resp = await self._request("POST", "/v4/product/info/stocks", json=payload)
         resp_json = resp.json()
         logger.info(

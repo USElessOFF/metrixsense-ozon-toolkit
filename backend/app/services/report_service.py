@@ -42,27 +42,26 @@ from backend.app.pydantic_models.ozon.performance.request import (
     StatisticsRequest,
 )
 from backend.app.pydantic_models.ozon.performance.response import Campaign
-from backend.app.pydantic_models.ozon.seller.enums import TransactionType
 from backend.app.pydantic_models.ozon.seller.request import (
     TurnoverStocksRequest,
     ProductQueriesRequest,
     AnalyticsStocksRequest,
+    FinanceAccrualByDayRequest,
+    FinanceCashFlowStatementListRequest,
     FinanceTransactionDateFilter,
-    FinanceTransactionListFilter,
-    FinanceTransactionListRequest,
-    FinanceTransactionTotalsRequest,
     ProductInfoListRequest,
     ProductInfoPricesV5Request,
     ProductInfoStocksRequest,
 )
 from backend.app.pydantic_models.ozon.seller.response import (
     AnalyticsStocksResponse,
-    FinanceOperation,
+    CashFlowStatement,
 )
 from backend.app.pydantic_models.report_cols_enum import ColumnsFullReport
 from backend.app.pydantic_models.report_sections import (
     FinanceExpenseRow,
     FinanceExpensesSectionResponse,
+    FinanceNonItemRow,
     PricesCommissionsRow,
     PricesCommissionsSectionResponse,
     ProductCardRow,
@@ -94,23 +93,74 @@ DEFAULT_LOGISTICS_COST = 150.0
 
 # Размер батча SKU для /v3/product/info/list (лимит Ozon)
 PRODUCT_INFO_BATCH_SIZE = 1000
-# Защитный предел страниц /v3/finance/transaction/list
+# Защитный предел страниц /v1/finance/accrual/by-day, если Ozon отдаст курсор
 FINANCE_MAX_PAGES = 100
 # Порог крупногабарита Ozon: сторона упаковки больше 500 мм → иная тарифная зона
 OVERSIZE_SIDE_MM = 500
 
-# Ozon закрыл детальную финансовую выписку v3 (400, code 9 «obsolete method
-# cannot be used») — секции «Начисления» и «ДДС» дают человеку понятную ошибку
-# вместо голого Client error 400. Замена появится после обновления API.
-_FINANCE_OBSOLETE_MARKER = "obsolete method cannot be used"
+# Ozon закрыл детальную выписку /v3/finance/transaction/list (400, code 9
+# «obsolete method cannot be used»). Финансы берём из новых методов:
+#   /v1/finance/accrual/by-day          — начисления по SKU за день
+#   /v1/finance/accrual/types           — справочник типов начислений
+#   /v1/finance/cash-flow-statement/list — ДДС недельными периодами
 _FINANCE_UNAVAILABLE_MESSAGE = (
-    "Финансовая выписка недоступна: Ozon закрыл метод /v3/finance/transaction (obsolete). "
-    "Секции «Начисления» и «ДДС» временно не работают — ожидайте обновление интеграции."
+    "Финансовые методы Ozon недоступны для этого кабинета. "
+    "Секции «Начисления» и «ДДС» требуют Seller-ключей с доступом к финансам."
 )
 
+# Классификация начислений по названию типа (/v1/finance/accrual/types):
+# в какую колонку отчёта относить сумму. Порядок проверок важен:
+# возвраты → доставка → комиссия → услуги.
+_FEE_RETURN_KEYS = ("return", "возврат", "обратн")
+_FEE_DELIVERY_KEYS = (
+    "logistic",
+    "delivery",
+    "lastmile",
+    "pickup",
+    "drop-off",
+    "dropoff",
+    "crossdock",
+    "кросс-док",
+    "кроссдок",
+    "shipment",
+    "fulfillment",
+    "oversized",
+    "логистик",
+    "достав",
+    "перевоз",
+)
+_FEE_COMMISSION_KEYS = ("commission", "комисси")
 
-def _finance_method_closed(e: Exception) -> bool:
-    return _FINANCE_OBSOLETE_MARKER in str(e)
+
+def _classify_accrual_fee(name: str | None) -> str:
+    """Какая это статья начисления: return_delivery / delivery / commission / services"""
+    low = (name or "").lower().replace(" ", "")
+    if any(key in low for key in _FEE_RETURN_KEYS):
+        return "return_delivery"
+    if any(key in low for key in _FEE_DELIVERY_KEYS):
+        return "delivery"
+    if any(key in low for key in _FEE_COMMISSION_KEYS):
+        return "commission"
+    return "services"
+
+
+def _accrual_amount(money: Any) -> float:
+    """Сумма из AccrualMoney (amount — строка, может быть None)"""
+    raw = getattr(money, "amount", None)
+    if raw is None:
+        return 0.0
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _as_charge(amount: float) -> float:
+    """Расход в начислениях отрицательный — приводим к положительной сумме.
+
+    Положительные суммы (компенсации, доплаты) уменьшают статью расходов.
+    """
+    return -amount
 
 
 class ReportService:
@@ -119,6 +169,7 @@ class ReportService:
     def __init__(self, adapter: MetrixAdapter):
         self.adapter = adapter
         self.pd_util: PandasUtil = PandasUtil()
+        self._accrual_warnings: list[str] = []
         self.readable_column_mapping = {
             "sku": "ID Товара",
             "Название товара": "Наименование",
@@ -179,6 +230,18 @@ class ReportService:
 
     async def list_reports(self, limit: int = 20) -> list[ReportRequestOzon]:
         return await self.adapter.list_report_requests(limit)
+
+    async def delete_report(self, request_uuid: str) -> bool:
+        """Удалить отчёт: запись, файлы и кэш"""
+        deleted = await self.adapter.delete_report_request(request_uuid)
+        if not deleted:
+            return False
+        from shutil import rmtree
+
+        rmtree(f"{config.PROJECT_ROOT}/files/{request_uuid}", ignore_errors=True)
+        await self.adapter.delete_cache(f"report_{request_uuid}")
+        await self.adapter.delete_cache(f"report_{request_uuid}_finance_totals")
+        return True
 
     async def get_report_data(self, request_uuid: str) -> list[dict[str, Any]] | None:
         """Данные готового отчёта из кэша (JSON строки unit-экономики)"""
@@ -373,7 +436,7 @@ class ReportService:
     async def get_finance_expenses_section(
         self, seller: OzonSellerClient, date_from: str, date_to: str
     ) -> FinanceExpensesSectionResponse:
-        """Секция «Финансовые начисления» (/v3/finance/transaction/list)"""
+        """Секция «Финансовые начисления» (/v1/finance/accrual/by-day)"""
         generated_at = datetime.now(tz=timezone.utc)
 
         self._validate_dates(
@@ -387,9 +450,10 @@ class ReportService:
             return cached
 
         # strict=True: ошибки выписки → 4xx/5xx
-        finance_df, totals = await self._collect_finance_operations_data(
+        finance_df, totals, non_item_rows = await self._collect_finance_operations_data(
             seller, date_from, date_to, strict=True
         )
+        section_warnings = self._accrual_warnings[:20]
         records = (
             json.loads(finance_df.replace({nan: None}).to_json(orient="records", force_ascii=False))
             if not finance_df.empty
@@ -415,6 +479,11 @@ class ReportService:
             date_from=date_from,
             date_to=date_to,
             totals=totals,
+            warnings=section_warnings,
+            non_item=[
+                FinanceNonItemRow(date=r["date"], name=r["name"], amount=r["amount"])
+                for r in non_item_rows
+            ],
             data=row_models,
         )
         await self._cache_section_payload("finance_expenses", payload.model_dump(mode="json"), cache_key=cache_key)
@@ -435,9 +504,12 @@ class ReportService:
         rows = [
             SellerRatingRow(
                 group_name=group.group_name,
-                rating_type=item.rating_type,
-                score=item.score,
-                description=item.description,
+                # Реальная схема Ozon: items[].name/current_value/past_value/status
+                rating_type=item.name,
+                score=item.current_value,
+                description=(
+                    f"Прошлое значение: {item.past_value}" if item.past_value is not None else None
+                ),
             )
             for group in resp.groups
             for item in group.items
@@ -476,10 +548,10 @@ class ReportService:
             return empty
 
         warehouses_by_sku: dict[str, list[StockWarehouseRow]] = {}
-        page = 1
-        while page <= 50:
+        cursor = ""
+        for _ in range(50):  # защитный предел страниц
             stocks_resp = await seller.get_product_info_stocks(
-                ProductInfoStocksRequest(page=page, page_size=1000)
+                ProductInfoStocksRequest(cursor=cursor, limit=1000)
             )
             for stock_item in stocks_resp.items:
                 for st in stock_item.stocks:
@@ -487,46 +559,45 @@ class ReportService:
                     warehouses_by_sku.setdefault(key, []).append(
                         StockWarehouseRow(name=st.warehouse_name, present=st.present, reserved=st.reserved)
                     )
-            if not stocks_resp.items:
+            if not stocks_resp.items or not stocks_resp.cursor:
                 break
-            page += 1
+            cursor = stocks_resp.cursor
 
         rows: list[StockPlanningRow] = []
-        for sku_batch in self.pd_util.split_list(skus, max_length=10):
-            resp = await seller.get_turnover_stocks(TurnoverStocksRequest(skus=sku_batch))
-            for item in resp.items:
-                calc = self._calc_stock_recommendation(
-                    item, target_days=settings.STOCK_TARGET_DAYS, critical_days=settings.STOCK_CRITICAL_DAYS
+        resp = await seller.get_turnover_stocks(TurnoverStocksRequest(limit=1000))
+        for item in resp.items:
+            calc = self._calc_stock_recommendation(
+                item, target_days=settings.STOCK_TARGET_DAYS, critical_days=settings.STOCK_CRITICAL_DAYS
+            )
+            days_of_stock = (
+                round(calc["days_of_stock"], 1) if calc["days_of_stock"] is not None else None
+            )
+            recommended_units = (
+                math.ceil(calc["recommended_stock"]) if calc["recommended_stock"] is not None else None
+            )
+            rows.append(
+                StockPlanningRow(
+                    sku=item.sku,
+                    name=item.name,
+                    offer_id=item.offer_id,
+                    current_stock=item.current_stock,
+                    ads=item.ads,
+                    days_of_stock=days_of_stock,
+                    idc=item.idc,
+                    idc_grade=item.idc_grade,
+                    turnover=item.turnover,
+                    recommended_stock=round(calc["recommended_stock"], 1) if calc["recommended_stock"] is not None else None,
+                    recommended_units=recommended_units,
+                    needs_reorder=calc["needs_reorder"],
+                    priority=self._supply_priority(
+                        calc["days_of_stock"],
+                        settings.STOCK_TARGET_DAYS,
+                        settings.STOCK_CRITICAL_DAYS,
+                    ),
+                    due_by=self._calc_due_by(calc["days_of_stock"]),
+                    warehouses=warehouses_by_sku.get(str(item.sku), []),
                 )
-                days_of_stock = (
-                    round(calc["days_of_stock"], 1) if calc["days_of_stock"] is not None else None
-                )
-                recommended_units = (
-                    math.ceil(calc["recommended_stock"]) if calc["recommended_stock"] is not None else None
-                )
-                rows.append(
-                    StockPlanningRow(
-                        sku=item.sku,
-                        name=item.name,
-                        offer_id=item.offer_id,
-                        current_stock=item.current_stock,
-                        ads=item.ads,
-                        days_of_stock=days_of_stock,
-                        idc=item.idc,
-                        idc_grade=item.idc_grade,
-                        turnover=item.turnover,
-                        recommended_stock=round(calc["recommended_stock"], 1) if calc["recommended_stock"] is not None else None,
-                        recommended_units=recommended_units,
-                        needs_reorder=calc["needs_reorder"],
-                        priority=self._supply_priority(
-                            calc["days_of_stock"],
-                            settings.STOCK_TARGET_DAYS,
-                            settings.STOCK_CRITICAL_DAYS,
-                        ),
-                        due_by=self._calc_due_by(calc["days_of_stock"]),
-                        warehouses=warehouses_by_sku.get(str(item.sku), []),
-                    )
-                )
+            )
 
         payload = StockPlanningSectionResponse(
             section="stock_planning",
@@ -633,7 +704,7 @@ class ReportService:
     async def get_cashflow_section(
         self, seller: OzonSellerClient, date_from: str, date_to: str
     ) -> CashFlowSectionResponse:
-        """Секция «ДДС-журнал»: все операции периода с бегущим балансом"""
+        """Секция «ДДС-журнал»: недельные периоды (/v1/finance/cash-flow-statement/list)"""
         generated_at = datetime.now(tz=timezone.utc)
         cache_key = self._section_cache_key("cashflow", f"{date_from}_{date_to}")
 
@@ -641,89 +712,94 @@ class ReportService:
         if cached is not None:
             return cached
 
-        operations = []
+        # Активность по ДДС возможна только за закрытые (прошедшие) периоды —
+        # предупреждаем, если диапазон включает текущую неделю.
+        warnings: list[str] = []
+        if date_to >= datetime.now(tz=timezone.utc).strftime(DATE_FORMAT):
+            warnings.append(
+                "Ozon показывает только закрытые периоды — текущая неделя появится в ДДС после её закрытия."
+            )
+
+        flows: list[CashFlowStatement] = []
         page = 1
-        while True:
+        while page <= FINANCE_MAX_PAGES:
             try:
-                resp = await seller.get_finance_transaction_list(
-                    FinanceTransactionListRequest(
-                        filter_=FinanceTransactionListFilter(
-                            date=FinanceTransactionDateFilter(
-                                from_=datetime.strptime(date_from, DATE_FORMAT).replace(tzinfo=timezone.utc),
-                                to=datetime.strptime(date_to, DATE_FORMAT).replace(tzinfo=timezone.utc),
-                            ),
-                            transaction_type=TransactionType.ALL,
+                resp = await seller.get_finance_cash_flow_statement_list(
+                    FinanceCashFlowStatementListRequest(
+                        date=FinanceTransactionDateFilter(
+                            from_=datetime.strptime(date_from, DATE_FORMAT).replace(tzinfo=timezone.utc),
+                            to=datetime.strptime(date_to, DATE_FORMAT).replace(tzinfo=timezone.utc),
                         ),
                         page=page,
-                        page_size=1000,
+                        page_size=50,
                     )
                 )
             except Exception as e:
-                if _finance_method_closed(e):
-                    raise OzonAPIError(_FINANCE_UNAVAILABLE_MESSAGE) from e
-                raise
-            operations.extend(resp.operations)
-            logger.info(
-                "::cashflow fetch page",
-                page=page,
-                got=len(resp.operations),
-                total_collected=len(operations),
-            )
-            if resp.page_count is None or page >= resp.page_count:
+                raise OzonAPIError(f"Не удалось получить ДДС Ozon: {e}") from e
+            result = resp.result
+            flows.extend(result.cash_flows)
+            if result.page_count is None or page >= int(result.page_count):
                 break
             page += 1
 
-        type_names = sorted({o.operation_type_name or o.operation_type or "unknown" for o in operations})
         logger.info(
             "::cashflow collected",
-            operations=len(operations),
-            types=type_names,
+            periods=len(flows),
+            date_from=date_from,
+            date_to=date_to,
         )
 
-        def _op_date(op: Any) -> datetime:
-            if not op.operation_date:
-                return datetime.min.replace(tzinfo=timezone.utc)
-            try:
-                return datetime.fromisoformat(op.operation_date.replace("Z", "+00:00"))
-            except ValueError:
-                return datetime.min.replace(tzinfo=timezone.utc)
-
-        operations.sort(key=_op_date)
-
         rows: list[CashFlowRow] = []
-        balance = 0.0
-        total_income = 0.0
-        total_expense = 0.0
-        type_summary: dict[str, float] = {}
-        for op in operations:
-            amount = op.amount or 0.0
-            balance += amount
-            if amount >= 0:
-                total_income += amount
-            else:
-                total_expense += abs(amount)
-            type_name = op.operation_type_name or op.operation_type or "Прочее"
-            type_summary[type_name] = type_summary.get(type_name, 0.0) + amount
+        total_orders = 0.0
+        total_returns = 0.0
+        total_commission = 0.0
+        total_services = 0.0
+        total_delivery = 0.0
+        for f in flows:
+            orders = f.orders_amount or 0.0
+            returns = f.returns_amount or 0.0
+            commission = f.commission_amount or 0.0
+            services = f.services_amount or 0.0
+            delivery = f.item_delivery_and_return_amount or 0.0
+            total_orders += orders
+            total_returns += returns
+            total_commission += commission
+            total_services += services
+            total_delivery += delivery
+            period = f.period
             rows.append(
                 CashFlowRow(
-                    date=op.operation_date,
-                    operation_type=op.operation_type,
-                    operation_type_name=op.operation_type_name,
-                    amount=amount,
-                    balance_after=round(balance, 2),
+                    date=period.begin if period else None,
+                    period_end=period.end if period else None,
+                    orders_amount=round(orders, 2),
+                    returns_amount=round(returns, 2),
+                    commission_amount=round(commission, 2),
+                    services_amount=round(services, 2),
+                    delivery_and_return_amount=round(delivery, 2),
+                    total=round(orders + returns + commission + services + delivery, 2),
                 )
             )
+        # Свежие периоды сверху
+        rows.sort(key=lambda r: r.date or "", reverse=True)
 
+        total_expense = abs(total_returns + total_commission + total_services + total_delivery)
         payload = CashFlowSectionResponse(
             section="cashflow",
             generated_at=generated_at,
             row_count=len(rows),
             date_from=date_from,
             date_to=date_to,
-            total_income=round(total_income, 2),
+            total_income=round(total_orders, 2),
             total_expense=round(total_expense, 2),
-            net_flow=round(total_income - total_expense, 2),
-            type_summary={k: round(v, 2) for k, v in type_summary.items()},
+            net_flow=round(total_orders - total_expense, 2),
+            type_summary={
+                "Заказы": round(total_orders, 2),
+                "Возвраты": round(total_returns, 2),
+                "Комиссия": round(total_commission, 2),
+                "Услуги": round(total_services, 2),
+                "Доставка и возврат": round(total_delivery, 2),
+            },
+            warnings=warnings,
             data=rows,
         )
         await self._cache_section_payload("cashflow", payload.model_dump(mode="json"), cache_key=cache_key)
@@ -830,13 +906,13 @@ class ReportService:
                     perf_df, perf_raw_cols = collected[0]
                     stocks_df = collected[1]
                     cards_df = collected[2]
-                    finance_df, finance_totals = collected[3]
+                    finance_df, finance_totals, _non_item = collected[3]
                 else:
                     perf_df = pd.DataFrame()
                     perf_raw_cols: list[str] = []
                     stocks_df = collected[0]
                     cards_df = collected[1]
-                    finance_df, finance_totals = collected[2]
+                    finance_df, finance_totals, _non_item = collected[2]
                 logger.info(
                     "::_compile_report> Preparing to merge data",
                     seller_cols=seller_df.columns.tolist(),
@@ -1122,80 +1198,31 @@ class ReportService:
         *,
         strict: bool = False,
     ) -> tuple[pd.DataFrame, dict[str, Any]]:
-        """Финансовые начисления → (DataFrame по SKU, totals)"""
-        empty = (pd.DataFrame(columns=["ID Товара"]), {})
+        """Финансовые начисления → (DataFrame по SKU, totals).
+
+        Источник — /v1/finance/accrual/by-day (день за днём), замена
+        закрытого Ozon метода /v3/finance/transaction/list.
+        """
+        empty = (pd.DataFrame(columns=[ColumnsFullReport.SKU]), {}, [])
         try:
-            date_filter = {
-                "date": {
-                    "from": f"{date_from}T00:00:00.000Z",
-                    "to": f"{date_to}T23:59:59.999Z",
-                },
-                # «all» - вся выписка; из неё агрегируем комиссии, доставки
-                # и начисления по товарам.
-                "transaction_type": TransactionType.ALL.value,
-            }
+            type_names = await self._accrual_type_names(seller)
+            start = datetime.strptime(date_from, DATE_FORMAT).date()
+            end = datetime.strptime(date_to, DATE_FORMAT).date()
+            self._accrual_warnings = []
 
             sku_aggregates: dict[int, dict[str, float]] = {}
-            counted_postings: set[str] = set()
-            page = 1
-            while page <= FINANCE_MAX_PAGES:
-                request = FinanceTransactionListRequest.model_validate(
-                    {"filter": date_filter, "page": page, "page_size": 1000}
+            non_item: dict[tuple[str, str], float] = {}
+            day = start
+            while day <= end:
+                await self._collect_accruals_for_day(
+                    seller,
+                    day.isoformat(),
+                    sku_aggregates,
+                    non_item,
+                    self._accrual_warnings,
+                    type_names,
                 )
-                resp = await seller.get_finance_transaction_list(request)
-                operations: list[FinanceOperation] = resp.operations
-                if not operations:
-                    break
-
-                for op in operations:
-                    delivery = op.delivery_charge or 0.0
-                    return_delivery = op.return_delivery_charge or 0.0
-                    commission = op.sale_commission or 0.0
-                    services_sum = sum((s.price or 0.0) for s in op.services)
-                    accruals = op.accruals_for_sale or 0.0
-
-                    posting_number = op.posting.posting_number if op.posting else None
-                    if posting_number and posting_number not in counted_postings:
-                        counted_postings.add(posting_number)
-
-                    for item in op.items:
-                        if item.sku is None:
-                            continue
-                        sku = int(item.sku)
-                        agg = sku_aggregates.setdefault(
-                            sku,
-                            {
-                                "commission": 0.0,
-                                "delivery": 0.0,
-                                "return_delivery": 0.0,
-                                "services": 0.0,
-                                "accruals": 0.0,
-                                "units": 0.0,
-                            },
-                        )
-                        agg["commission"] += commission
-                        agg["delivery"] += delivery
-                        agg["return_delivery"] += return_delivery
-                        agg["services"] += services_sum
-                        agg["accruals"] += accruals
-                        agg["units"] += 1  # единица товара в операции
-
-                if resp.page_count is not None and page >= int(resp.page_count):
-                    break
-                page += 1
-
-            # Точные итоги периода - из totals-метода
-            totals: dict[str, Any] = {}
-            try:
-                totals_request = FinanceTransactionTotalsRequest.model_validate(
-                    # У totals фильтр плоский (date/transaction_type на верхнем
-                    # уровне тела), а date_filter имеет ровно такую структуру.
-                    date_filter
-                )
-                totals_resp = await seller.get_finance_transaction_totals(totals_request)
-                totals = totals_resp.result
-            except Exception as e:
-                logger.warning("::_collect_finance_operations_data> Totals failed", error=str(e))
+                day += timedelta(days=1)
 
             rows: list[dict[str, Any]] = []
             for sku, agg in sku_aggregates.items():
@@ -1209,7 +1236,7 @@ class ReportService:
                         ColumnsFullReport.FIN_SERVICES: round(agg["services"], 2),
                         ColumnsFullReport.FIN_ACCRUALS: round(agg["accruals"], 2),
                         # Фактическая логистика на единицу для юнит-экономики:
-                        # сумма тарифов доставки по выписке / количество единиц.
+                        # сумма тарифов доставки / количество отгруженных единиц.
                         ColumnsFullReport.FIN_LOGISTICS_PER_UNIT: (
                             round((abs(agg["delivery"]) + abs(agg["return_delivery"])) / units, 2)
                             if units > 0
@@ -1220,20 +1247,131 @@ class ReportService:
             df = pd.DataFrame(rows)
             if not df.empty:
                 df[ColumnsFullReport.SKU] = df[ColumnsFullReport.SKU].astype("int64")
+
+            non_item_rows = [
+                {"date": d, "name": n, "amount": round(v, 2)}
+                for (d, n), v in sorted(non_item.items(), key=lambda kv: kv[0], reverse=True)
+            ]
+            non_item_total = round(sum(non_item.values()), 2)
+
+            # Итоги периода — из тех же агрегатов (totals-метод v3 закрыт).
+            # services включает NON_ITEM (реклама, подписки — крупные статьи).
+            totals: dict[str, Any] = {
+                "commission": round(sum(a["commission"] for a in sku_aggregates.values()), 2),
+                "delivery": round(sum(a["delivery"] for a in sku_aggregates.values()), 2),
+                "return_delivery": round(sum(a["return_delivery"] for a in sku_aggregates.values()), 2),
+                "services": round(
+                    sum(a["services"] for a in sku_aggregates.values()) + non_item_total, 2
+                ),
+                "accruals": round(sum(a["accruals"] for a in sku_aggregates.values()), 2),
+            }
+            if non_item_total:
+                totals["services_non_item"] = non_item_total
             logger.info(
-                "::_collect_finance_operations_data> Finance operations collected",
+                "::_collect_finance_operations_data> Finance accruals collected",
                 sku_rows=len(df),
-                pages=page,
-                unique_postings=len(counted_postings),
+                days=(end - start).days + 1,
+                non_item=round(non_item_total, 2),
             )
-            return df, totals
+            return df, totals, non_item_rows
         except Exception as e:
             logger.exception("::_collect_finance_operations_data> Failed", error=str(e))
-            if _finance_method_closed(e):
-                raise OzonAPIError(_FINANCE_UNAVAILABLE_MESSAGE) from e
             if strict:
                 raise OzonAPIError(f"Не удалось получить финансовую выписку: {e}") from e
             return empty
+
+    async def _accrual_type_names(self, seller: OzonSellerClient) -> dict[int, str]:
+        """Справочник типов начислений: id → человекочитаемое название"""
+        try:
+            resp = await seller.get_finance_accrual_types()
+            return {
+                int(t.id): (t.description or t.name or str(t.id))
+                for t in resp.accrual_types
+                if t.id is not None
+            }
+        except Exception as e:
+            logger.warning("::_accrual_type_names> Failed", error=str(e))
+            return {}
+
+    async def _collect_accruals_for_day(
+        self,
+        seller: OzonSellerClient,
+        day: str,
+        sku_aggregates: dict[int, dict[str, float]],
+        non_item: dict[tuple[str, str], float],
+        warnings: list[str],
+        type_names: dict[int, str],
+    ) -> None:
+        """Начисления одного дня (/v1/finance/accrual/by-day) → агрегаты по SKU"""
+        resp = await seller.get_finance_accrual_by_day(FinanceAccrualByDayRequest(date=day))
+
+        def _acc_add(sku: int | None, field: str, value: float, *, unit: bool = False) -> None:
+            if sku is None:
+                if value or unit:
+                    warnings.append(
+                        f"{day}: начисление на {value:+.2f} ₽ не привязано к товару — в разрезе SKU не учтено"
+                    )
+                return
+            agg = sku_aggregates.setdefault(
+                sku,
+                {
+                    "commission": 0.0,
+                    "delivery": 0.0,
+                    "return_delivery": 0.0,
+                    "services": 0.0,
+                    "accruals": 0.0,
+                    "units": 0.0,
+                },
+            )
+            agg[field] += value
+            if unit:
+                agg["units"] += 1
+
+        empty_item_seen = False
+        for acc in resp.accruals:
+            total = _accrual_amount(acc.total_amount)
+
+            if acc.item_fees is not None:
+                sku = int(acc.item_fees.sku) if acc.item_fees.sku is not None else None
+                day_item_sum = 0.0
+                for fee in acc.item_fees.fees:
+                    amount = _accrual_amount(fee.accrued)
+                    day_item_sum += amount
+                    _acc_add(sku, _classify_accrual_fee(type_names.get(fee.type_id or 0)), amount)
+                if total:
+                    _acc_add(sku, "accruals", total)
+                elif not day_item_sum:
+                    # Ozon отдаёт ITEM-начисления без сумм (комиссия недоступна
+                    # в этом методе) — фиксируем только факт отгрузки единицы.
+                    empty_item_seen = True
+                    _acc_add(sku, "accruals", 0.0, unit=True)
+
+            posting = acc.posting
+            if posting is not None:
+                for product in posting.products:
+                    sku = int(product.sku) if product.sku is not None else None
+                    for svc in (product.delivery.services if product.delivery else []) or []:
+                        amount = _accrual_amount(svc.accrued)
+                        _acc_add(sku, _classify_accrual_fee(type_names.get(svc.type_id or 0)), amount)
+                    commission = _accrual_amount(product.commission)
+                    if commission:
+                        _acc_add(sku, "commission", commission)
+                    # Единица отгрузки — товар в отправлении
+                    _acc_add(sku, "accruals", 0.0, unit=True)
+
+            non_item_fee = acc.non_item_fee
+            if non_item_fee is not None and non_item_fee.accrued is not None:
+                amount = _accrual_amount(non_item_fee.accrued)
+                if amount:
+                    name = type_names.get(non_item_fee.type_id or 0, "Начисление Ozon")
+                    key = (day, name)
+                    non_item[key] = non_item.get(key, 0.0) + amount
+
+        if empty_item_seen and len(warnings) < 40:
+            warnings.append(
+                f"{day}: Ozon вернул карточные начисления (ITEM) без сумм — "
+                "комиссия за продажу недоступна через этот метод, в колонках будет 0"
+            )
 
     async def _collect_full_performance_data(
         self, performance: OzonPerformanceClient, date_from: str, date_to: str, request_uuid: str

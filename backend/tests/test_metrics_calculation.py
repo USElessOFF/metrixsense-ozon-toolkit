@@ -546,9 +546,9 @@ class TestNewSellerMethods:
         assert payload["date_from"] == "2026-08-18T00:00:00Z"
 
     def test_turnover_stocks_request_excludes_none(self) -> None:
-        """Запрос оборачиваемости без null-полей"""
-        payload = TurnoverStocksRequest(skus=[1, "2"]).model_dump(mode="json", exclude_none=True)
-        assert payload == {"skus": ["1", "2"]}
+        """Запрос оборачиваемости: схема {limit} без null-полей"""
+        payload = TurnoverStocksRequest(limit=100).model_dump(mode="json", exclude_none=True)
+        assert payload == {"limit": 100}
 
     @pytest.mark.asyncio
     async def test_get_product_queries_parses_response(self) -> None:
@@ -694,63 +694,78 @@ class TestSearchQueriesSection:
 
 
 class TestCashflowSection:
-    """ДДС-журнал: бегущий баланс, split приход/расход, сводка типов"""
+    """ДДС: недельные периоды, KPI по статьям"""
 
-    def _op(self, **kw):
-        from backend.app.pydantic_models.ozon.seller.response import FinanceOperation
+    def _row(self, **kw):
+        from backend.app.pydantic_models.report_sections import CashFlowRow
         defaults = dict(
-            operation_id=1,
-            operation_type="OperationOrderPayment",
-            operation_type_name="Продажа",
-            operation_date="2026-08-02T10:00:00.000Z",
-            amount=100.0,
+            date="2026-09-07T00:00:00Z",
+            period_end="2026-09-14T00:00:00Z",
+            orders_amount=100.0,
+            returns_amount=-30.0,
+            commission_amount=-20.0,
+            services_amount=-5.0,
+            delivery_and_return_amount=-10.0,
+            total=35.0,
         )
         defaults.update(kw)
-        return FinanceOperation(**defaults)
+        return CashFlowRow(**defaults)
 
-    def _sorted_with_balance(self, ops):
-        """Повторяет логику сервиса: сортировка по дате + бегущий баланс"""
-        from datetime import datetime
+    def test_row_totals(self):
+        r = self._row()
+        net = (r.orders_amount or 0) + (r.returns_amount or 0) + (r.commission_amount or 0) + (r.services_amount or 0) + (r.delivery_and_return_amount or 0)
+        assert round(net, 2) == 35.0
+        assert (r.total or 0) == round(net, 2)
 
-        def _d(op):
-            return datetime.fromisoformat(op.operation_date.replace("Z", "+00:00"))
-
-        ops = sorted(ops, key=_d)
-        rows, balance = [], 0.0
-        for op in ops:
-            balance += op.amount or 0.0
-            rows.append((op.amount, round(balance, 2)))
-        return rows
-
-    def test_running_balance_sorted_by_date(self):
-        """Операции приходят сверху вниз (свежие первыми) — баланс считается по датам"""
-        ops = [
-            self._op(operation_id=3, operation_date="2026-08-03T10:00:00.000Z", amount=50.0),
-            self._op(operation_id=1, operation_date="2026-08-01T10:00:00.000Z", amount=100.0),
-            self._op(operation_id=2, operation_date="2026-08-02T10:00:00.000Z", amount=-30.0),
+    def test_kpi_split(self):
+        rows = [
+            self._row(orders_amount=100.0, returns_amount=-30.0, commission_amount=-20.0, services_amount=-5.0, delivery_and_return_amount=-10.0),
+            self._row(orders_amount=50.0, returns_amount=0.0, commission_amount=-10.0, services_amount=-1.0, delivery_and_return_amount=-4.0),
         ]
-        rows = self._sorted_with_balance(ops)
-        assert rows == [(100.0, 100.0), (-30.0, 70.0), (50.0, 120.0)]
-
-    def test_income_expense_split(self):
-        """Положительные — приход, отрицательные — расход"""
-        amounts = [100.0, -30.0, 50.0]
-        income = sum(a for a in amounts if a >= 0)
-        expense = sum(abs(a) for a in amounts if a < 0)
+        income = sum(r.orders_amount for r in rows)
+        expense = sum(abs((r.returns_amount or 0) + (r.commission_amount or 0) + (r.services_amount or 0) + (r.delivery_and_return_amount or 0)) for r in rows)
         assert income == 150.0
-        assert expense == 30.0
+        assert expense == 80.0
 
-    def test_type_summary_aggregates(self):
-        """Сводка по типам операций суммируется корректно"""
-        ops = [
-            self._op(operation_type_name="Продажа", amount=100.0),
-            self._op(operation_type_name="Продажа", amount=200.0),
-            self._op(operation_type_name="Услуги", amount=-50.0),
-        ]
-        summary: dict = {}
-        for op in ops:
-            summary[op.operation_type_name] = summary.get(op.operation_type_name, 0.0) + op.amount
-        assert summary == {"Продажа": 300.0, "Услуги": -50.0}
+    def test_sort_desc_by_period(self):
+        rows = [self._row(date="2026-08-31"), self._row(date="2026-09-07")]
+        out = sorted(rows, key=lambda r: r.date or "", reverse=True)
+        assert out[0].date == "2026-09-07"
+
+
+class TestAccrualClassification:
+    """Раскладка типов начислений по статьям отчёта"""
+
+    def test_commission_and_returns(self):
+        from backend.app.services.report_service import _classify_accrual_fee
+        assert _classify_accrual_fee("Комиссия за продажу") == "commission"
+        assert _classify_accrual_fee("SaleCommission") == "commission"
+        assert _classify_accrual_fee("Обратная логистика") == "return_delivery"
+        assert _classify_accrual_fee("Обработка возвратов, отмен и невыкупов") == "return_delivery"
+
+    def test_delivery_group(self):
+        from backend.app.services.report_service import _classify_accrual_fee
+        assert _classify_accrual_fee("Логистика") == "delivery"
+        assert _classify_accrual_fee("Доставка до места выдачи") == "delivery"
+        assert _classify_accrual_fee("Кросс-докинг") == "delivery"
+
+    def test_services_fallback(self):
+        from backend.app.services.report_service import _classify_accrual_fee
+        assert _classify_accrual_fee("Эквайринг") == "services"
+        assert _classify_accrual_fee("Подписка Premium") == "services"
+        assert _classify_accrual_fee("Оплата за клик") == "services"
+        assert _classify_accrual_fee(None) == "services"
+
+    def test_amount_parsing(self):
+        from backend.app.services.report_service import _accrual_amount
+        assert _accrual_amount(None) == 0.0
+        assert _accrual_amount({"amount": None}) == 0.0
+
+        from backend.app.pydantic_models.ozon.seller.response import AccrualMoney
+        assert _accrual_amount(AccrualMoney(amount="-13.95")) == -13.95
+        assert _accrual_amount(AccrualMoney(amount="abc")) == 0.0
+
+
 class TestSupplyPlan:
     """Приоритеты, дата ухода в ноль, округление поставки, сводка"""
 

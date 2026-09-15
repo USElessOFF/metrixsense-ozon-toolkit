@@ -255,6 +255,20 @@ def get_reports_router() -> APIRouter:
         reports = await service.list_reports(min(limit, 100))
         return [ReportStatusResponse.model_validate(r, from_attributes=True) for r in reports]
 
+    @router.delete(
+        "/requests/{request_id}",
+    )
+    async def delete_report(
+        request_id: str,
+        db: MetrixAdapter = Depends(get_metrix_adapter_for_user),  # noqa: B008
+    ) -> dict[str, str]:
+        """Удалить отчёт (запись, файлы, кэш)"""
+        service = ReportService(db)
+        deleted = await service.delete_report(request_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Report not found")
+        return {"status": "deleted"}
+
     @router.get(
         "/requests/{request_id}/download",
     )

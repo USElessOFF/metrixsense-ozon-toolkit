@@ -103,6 +103,14 @@ class FinanceExpenseRow(BaseModel):
     )
 
 
+class FinanceNonItemRow(BaseModel):
+    """Начисление Ozon без привязки к товару (NON_ITEM): реклама, подписки и т.п."""
+
+    date: str | None = Field(default=None, description="Дата начисления (YYYY-MM-DD).")
+    name: str = Field(..., description="Название типа начисления.")
+    amount: float = Field(default=0.0, description="Сумма, ₽ (расход отрицательный).")
+
+
 class FinanceExpensesSectionResponse(SectionMeta):
     """Ответ секции «Финансовые начисления»"""
 
@@ -110,6 +118,10 @@ class FinanceExpensesSectionResponse(SectionMeta):
     date_to: str = Field(..., description="Конец периода (YYYY-MM-DD).")
     totals: dict[str, Any] = Field(
         default_factory=dict, description="Итоги периода (/v3/finance/transaction/totals)."
+    )
+    non_item: list[FinanceNonItemRow] = Field(
+        default_factory=list,
+        description="Начисления без привязки к товару (реклама, подписки и пр.).",
     )
     data: list[FinanceExpenseRow] = Field(default_factory=list)
 
@@ -209,15 +221,18 @@ class SearchQueriesSectionResponse(SectionMeta):
 
 
 class CashFlowRow(BaseModel):
-    """Строка ДДС-журнала (операция с бегущим балансом)"""
+    """Строка ДДС — недельный период (/v1/finance/cash-flow-statement/list)"""
 
-    model_config = ConfigDict(protected_namespaces=())
-
-    date: str | None = Field(default=None, description="Дата операции.")
-    operation_type: str | None = Field(default=None, description="Тип операции (API).")
-    operation_type_name: str | None = Field(default=None, description="Название типа операции.")
-    amount: float | None = Field(default=None, description="Сумма: + приход, - расход, ₽.")
-    balance_after: float | None = Field(default=None, description="Накопленный баланс после операции, ₽.")
+    date: str | None = Field(default=None, description="Начало периода.")
+    period_end: str | None = Field(default=None, description="Конец периода.")
+    orders_amount: float | None = Field(default=None, description="Заказы, ₽.")
+    returns_amount: float | None = Field(default=None, description="Возвраты, ₽.")
+    commission_amount: float | None = Field(default=None, description="Комиссия Ozon, ₽.")
+    services_amount: float | None = Field(default=None, description="Услуги Ozon, ₽.")
+    delivery_and_return_amount: float | None = Field(
+        default=None, description="Доставка и возврат, ₽."
+    )
+    total: float | None = Field(default=None, description="Итог по периоду, ₽.")
 
 
 class CashFlowSectionResponse(SectionMeta):

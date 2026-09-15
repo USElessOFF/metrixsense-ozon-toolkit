@@ -8,22 +8,27 @@ import { PeriodPicker } from '../components/PeriodPicker'
 import { Card, ErrorState, Kpi, Loading, PageHead, Warnings } from '../components/ui'
 import { defaultRange, fmtDate, fmtMoney } from '../lib/format'
 
+const money = (v: number | null) => (v == null ? '—' : fmtMoney(v))
+
 const columns: Column<CashFlowRow>[] = [
-  { key: 'date', title: 'Дата', value: r => r.date, render: r => fmtDate(r.date) },
-  { key: 'operation_type_name', title: 'Операция', value: r => r.operation_type_name },
   {
-    key: 'amount',
-    title: 'Сумма',
-    align: 'right',
-    value: r => r.amount,
-    render: r =>
-      r.amount === null ? (
-        '—'
-      ) : (
-        <span className={r.amount >= 0 ? 'pos' : 'neg'}>{fmtMoney(r.amount)}</span>
-      ),
+    key: 'date',
+    title: 'Период',
+    value: r => `${r.date ?? ''} ${r.period_end ?? ''}`,
+    render: r => `${fmtDate(r.date)} — ${fmtDate(r.period_end)}`,
   },
-  { key: 'balance_after', title: 'Баланс после', align: 'right', value: r => r.balance_after, render: r => fmtMoney(r.balance_after) },
+  { key: 'orders_amount', title: 'Заказы', align: 'right', value: r => r.orders_amount, render: r => <span className="pos">{money(r.orders_amount)}</span> },
+  { key: 'returns_amount', title: 'Возвраты', align: 'right', value: r => r.returns_amount, render: r => <span className="neg">{money(r.returns_amount)}</span> },
+  { key: 'commission_amount', title: 'Комиссия', align: 'right', value: r => r.commission_amount, render: r => <span className="neg">{money(r.commission_amount)}</span> },
+  { key: 'services_amount', title: 'Услуги', align: 'right', value: r => r.services_amount, render: r => <span className="neg">{money(r.services_amount)}</span> },
+  { key: 'delivery_and_return_amount', title: 'Доставка', align: 'right', value: r => r.delivery_and_return_amount, render: r => <span className="neg">{money(r.delivery_and_return_amount)}</span> },
+  {
+    key: 'total',
+    title: 'Итог',
+    align: 'right',
+    value: r => r.total,
+    render: r => (r.total == null ? '—' : <span className={r.total >= 0 ? 'pos' : 'neg'}>{fmtMoney(r.total)}</span>),
+  },
 ]
 
 export default function Cashflow() {
@@ -37,7 +42,7 @@ export default function Cashflow() {
     <>
       <PageHead
         title="ДДС-журнал"
-        sub="Все операции периода с накопленным балансом"
+        sub="Поток денег по неделям (закрытые периоды Ozon)"
         actions={<PeriodPicker from={range.date_from} to={range.date_to} onChange={setRange} />}
       />
       {loading && <Loading />}
@@ -45,8 +50,8 @@ export default function Cashflow() {
       {data && (
         <>
           <div className="kpi-grid">
-            <Kpi label="Приход" value={fmtMoney(data.total_income)} />
-            <Kpi label="Расход" value={fmtMoney(data.total_expense)} />
+            <Kpi label="Заказы" value={fmtMoney(data.total_income)} />
+            <Kpi label="Расходы Ozon" value={fmtMoney(data.total_expense)} />
             <Kpi
               label="Чистый поток"
               value={fmtMoney(data.net_flow)}
@@ -55,7 +60,7 @@ export default function Cashflow() {
           </div>
           <Warnings items={data.warnings} />
           {Object.keys(data.type_summary).length > 0 && (
-            <Card title="Итог по типам операций">
+            <Card title="Итог по статьям">
               <div className="chips">
                 {Object.entries(data.type_summary).map(([type, sum]) => (
                   <span key={type} className={`chip ${sum >= 0 ? 'ok' : 'bad'}`}>
@@ -69,9 +74,9 @@ export default function Cashflow() {
             <DataTable
               columns={columns}
               rows={data.data}
-              rowKey={(r, i) => `${r.date}-${r.operation_type}-${i}`}
+              rowKey={(r, i) => `${r.date}-${i}`}
               filter={(r, q) =>
-                [r.operation_type_name, r.operation_type, r.date].some(v =>
+                [r.date, r.period_end].some(v =>
                   String(v ?? '').toLowerCase().includes(q),
                 )
               }
